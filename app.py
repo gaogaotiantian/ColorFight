@@ -58,6 +58,8 @@ def require(*required_args, **kw_req_args):
 class CellDb(db.Model):
     __tablename__ = 'cells'
     id            = db.Column(db.Integer, primary_key = True)
+    x             = db.Column(db.Integer)
+    y             = db.Column(db.Integer)
     owner         = db.Column(db.Integer, default = 0)
     occupy_time   = db.Column(db.Float, default = 0)
     is_taking     = db.Column(db.Boolean, default = False)
@@ -65,19 +67,26 @@ class CellDb(db.Model):
     attack_time   = db.Column(db.Float, default = 0)
     finish_time   = db.Column(db.Float, default = 0)
     
-    def GetTakeTimeEq(timeDiff):
+    def Init(self, owner, currTime):
+        self.owner = owner
+        self.occupy_time = currTime
+        self.is_taking = False
+        self.attacker = 0
+
+    def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
             return 200
-        return 100/timeDiff
+        return 20*(2**(-timeDiff/20))+2
 
     def GetTakeTime(self, currTime):
         if self.is_taking == False:
             if self.owner != 0:
                 takeTime  = self.GetTakeTimeEq(currTime - self.occupy_time)
             else:
-                takeTime = 1
+                takeTime = 2
         else:
             takeTime = -1
+        return takeTime
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
@@ -88,15 +97,24 @@ class CellDb(db.Model):
     def Attack(self, uid, currTime):
         if self.is_taking == True:
             return False
+        # Check whether it's adjacent to an occupied cell
+        if self.owner != uid:
+            for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
+                if adjc != None and adjc.owner == uid:
+                    break
+            else:
+                return False
+        user = UserDb.query.get(uid)
+        if user.cd_time > currTime:
+            return False
         self.attacker = uid
         self.attack_time = currTime
+        self.finish_time = currTime + self.GetTakeTime(currTime)
         self.is_taking = True
-        if self.owner == 0:
-            self.finish_time = currTime + 1
-        elif self.owner == uid:
-            self.finish_time = currTime + 2
-        else:
-            self.finish_time = currTime + self.GetTakeTimeEq(currTime - self.occupy_time)
+        db.session.commit()
+        user = UserDb.query.with_for_update().get(uid)
+        user.cd_time = self.finish_time
         db.session.commit()
         return True
 
@@ -108,11 +126,18 @@ class InfoDb(db.Model):
     max_id        = db.Column(db.Integer, default = 0)         
 
 class UserDb(db.Model):
-    __tablename__ = 'user'
+    __tablename__ = 'users'
     id            = db.Column(db.Integer, primary_key = True)
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
     cd_time       = db.Column(db.Integer)
+
+    def CheckDead(self):
+        cells = CellDb.query.filter_by(owner = self.id).count()
+        if cells == 0:
+            db.session.delete(self)
+            return True
+        return False
 
 db.create_all()
 
@@ -151,7 +176,7 @@ def StartGame():
         for x in range(width):
             c = CellDb.query.get(x + y * width)
             if c == None:
-                c = CellDb(id = x + y * width)
+                c = CellDb(id = x + y * width, x = x, y = y)
                 db.session.add(c)
             else:
                 c.owner = 0
@@ -168,24 +193,36 @@ def GetGameInfo():
     info = InfoDb.query.get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
+    currTime = time.time()
     cells = CellDb.query.filter(CellDb.id < info.max_id).with_for_update().order_by(CellDb.id).all()
     retInfo = {}
-    retInfo['info'] = {'width':info.width, 'height':info.height}
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime}
     cellInfo = []
-    currTime = time.time()
     for cell in cells:
-        takeTime = cell.GetTakeTime(currTime)
         cell.Refresh(currTime)
-        c = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 't': takeTime, 'f':cell.finish_time}
+        takeTime = cell.GetTakeTime(currTime)
+        c = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 'ot':cell.occupy_time, 'at':cell.attack_time, 't': takeTime, 'f':cell.finish_time}
         cellInfo.append(c)
     db.session.commit()
     retInfo['cells'] = cellInfo
+
+    users = UserDb.query.with_for_update().all()
+    userInfo = []
+    for user in users:
+        if not user.CheckDead():
+            cellNum = CellDb.query.filter_by(owner = user.id).count()
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
+    db.session.commit()
+
+    retInfo['users'] = userInfo
+
     return GetResp((200, retInfo))
 
-@require('name')
 @app.route('/joingame', methods=['POST'])
+@require('name')
 def JoinGame():
     data = request.get_json()
+    print data
     users = UserDb.query.order_by(UserDb.id).with_for_update().all()
     availableId = 1
     for u in users:
@@ -197,12 +234,17 @@ def JoinGame():
     newUser = UserDb(id = availableId, name = data['name'], token = token)
     db.session.add(newUser)
     db.session.commit()
-    ret = flask.jsonify({'token':token})
-    ret.status_code = 200
-    return ret
+    cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
+    if cell != None:
+        cell.Init(availableId, time.time())
+        db.session.commit()
+        return GetResp((200, {'token':token}))
+    else:
+        db.session.commit()
+        return GetResp((200, {'err_code':3, 'err_msg':'No cell available to start'}))
     
-@require('cellx', 'celly', 'token')
 @app.route('/attack', methods=['POST'])
+@require('cellx', 'celly', 'token')
 def Attack():
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
@@ -217,7 +259,7 @@ def Attack():
     if (cellx < 0 or cellx >= width or 
             celly < 0 or celly >= height):
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
-    c = CellDb.query.filter_by(id = cellx + celly*width).first()
+    c = CellDb.query.filter_by(id = cellx + celly*width).with_for_update().first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
     if c.Attack(uid, time.time()):
