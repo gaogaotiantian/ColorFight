@@ -36,7 +36,7 @@ DrawGame = function(canvas, info, cells) {
         var attacker = cell['a'];
         if (cell['c'] == 0) {
             canvas.drawRect( {
-                fillStyle: CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/20)),
+                fillStyle: CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10)),
                 strokeStyle: 'white',
                 strokeWidth: 3,
                 x: cell.x*20,
