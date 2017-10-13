@@ -96,7 +96,7 @@ class CellDb(db.Model):
 
     def Attack(self, uid, currTime):
         if self.is_taking == True:
-            return False
+            return False, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
         if self.owner != uid:
             for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -104,10 +104,10 @@ class CellDb(db.Model):
                 if adjc != None and adjc.owner == uid:
                     break
             else:
-                return False
+                return False, "Cell position invalid or it's not adjacent to your cell."
         user = UserDb.query.get(uid)
         if user.cd_time > currTime:
-            return False
+            return False, "You are in CD time!"
         self.attacker = uid
         self.attack_time = currTime
         self.finish_time = currTime + self.GetTakeTime(currTime)
@@ -116,7 +116,7 @@ class CellDb(db.Model):
         user = UserDb.query.with_for_update().get(uid)
         user.cd_time = self.finish_time
         db.session.commit()
-        return True
+        return True, None
 
 class InfoDb(db.Model):
     __tablename__ = 'info'
@@ -261,10 +261,11 @@ def Attack():
     c = CellDb.query.filter_by(id = cellx + celly*width).with_for_update().first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    if c.Attack(uid, time.time()):
+    success, msg = c.Attack(uid, time.time())
+    if success:
         return GetResp((200, {"err_code":0}))
     else:
-        return GetResp((200, {"err_code":2, "err_msg":"Can't attack this cell"}))
+        return GetResp((200, {"err_code":2, "err_msg":msg}))
 
 @app.route('/checktoken', methods=['POST'])
 @require('token')
