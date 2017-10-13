@@ -265,9 +265,17 @@ def Attack():
         return GetResp((200, {"err_code":0}))
     else:
         return GetResp((200, {"err_code":2, "err_msg":"Can't attack this cell"}))
-    
+
+@app.route('/checktoken', methods=['POST'])
+@require('token')
+def CheckToken():
+    data = request.get_json()
+    if UserDb.query.filter_by(token = data['token']).count() > 0:
+        return GetResp((200, {"msg":"Success"}))
+    return GetResp((400, {"msg":"Fail"}))
     
 
+@app.route('/')
 @app.route('/index.html')
 def Index():
     return render_template('index.html')

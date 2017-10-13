@@ -35,9 +35,6 @@ DrawGame = function(canvas, info, cells) {
         var owner = cell['o'];
         var attacker = cell['a'];
         if (cell['c'] == 0) {
-            if (cell['t'] < 1) {
-                console.log(cell)
-            }
             canvas.drawRect( {
                 fillStyle: CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/20)),
                 strokeStyle: 'white',
@@ -91,7 +88,6 @@ CreateGame = function() {
 }
 
 JoinGame = function() {
-    console.log($('#name').val())
     $.ajax( {
         url: hostUrl+"joingame",
         method: "POST",
@@ -112,7 +108,6 @@ Attack = function(x, y, token) {
         contentType: 'application/json;charset=UTF-8',
         data: JSON.stringify({"cellx":x, "celly":y, "token":token}),
         success: function(msg) {
-            console.log(msg);
         },
     })
 }
