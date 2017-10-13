@@ -271,7 +271,7 @@ def Attack():
 def CheckToken():
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
-    if u != None
+    if u != None:
         return GetResp((200, {"name":u.name, "uid":u.id}))
     return GetResp((400, {"msg":"Fail"}))
     
