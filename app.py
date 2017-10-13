@@ -222,7 +222,6 @@ def GetGameInfo():
 @require('name')
 def JoinGame():
     data = request.get_json()
-    print data
     users = UserDb.query.order_by(UserDb.id).with_for_update().all()
     availableId = 1
     for u in users:
