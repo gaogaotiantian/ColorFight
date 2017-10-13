@@ -237,7 +237,7 @@ def JoinGame():
     if cell != None:
         cell.Init(availableId, time.time())
         db.session.commit()
-        return GetResp((200, {'token':token}))
+        return GetResp((200, {'token':token, 'uid':availableId}))
     else:
         db.session.commit()
         return GetResp((200, {'err_code':3, 'err_msg':'No cell available to start'}))
@@ -270,8 +270,9 @@ def Attack():
 @require('token')
 def CheckToken():
     data = request.get_json()
-    if UserDb.query.filter_by(token = data['token']).count() > 0:
-        return GetResp((200, {"msg":"Success"}))
+    u = UserDb.query.filter_by(token = data['token']).first()
+    if u != None
+        return GetResp((200, {"name":u.name, "uid":u.id}))
     return GetResp((400, {"msg":"Fail"}))
     
 
