@@ -1,6 +1,6 @@
 //hostUrl = "http://localhost:8000/"
 hostUrl = "http://colorfight.herokuapp.com/"
-var gameStatus = {}
+var gameStatus = {"cellSize":20}
 var once = {'once':0};
 GetGameInfo = function() {
     $.get(hostUrl + "getgameinfo", 
@@ -23,10 +23,13 @@ ListUsers = function(users) {
     });
     for (idx in users) {
         user = users[idx];
-        $('#user_list').append($("<div>").append($("<span>").text(user['name'] + ' | ' + user['cell_num'].toString()).css("color", HashIdToColor(user['id']))));
+        $('#user_list').append($("<div>").addClass("col-3").append($("<span>").text(user['name'] + ' | ' + user['cell_num'].toString()).css("color", HashIdToColor(user['id']))));
     }
 }
 DrawGame = function(canvas, info, cells) {
+    canvas[0].width = canvas.parent().width();
+    canvas[0].height = canvas[0].width;
+    gameStatus.cellSize = Math.floor(canvas[0].width/info['width']);
     var width = info['width'];
     var height = info['height'];
     var currTime = info['time'];
@@ -39,22 +42,22 @@ DrawGame = function(canvas, info, cells) {
                 fillStyle: CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10)),
                 strokeStyle: 'white',
                 strokeWidth: 3,
-                x: cell.x*20,
-                y: cell.y*20,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
                 fromCenter: false,
-                width: 20,
-                height: 20
+                width: gameStatus.cellSize,
+                height: gameStatus.cellSize 
             });
         } else {
             canvas.drawRect( {
                 fillStyle: CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at']))),
                 strokeStyle: 'white',
                 strokeWidth: 3,
-                x: cell.x*20,
-                y: cell.y*20,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
                 fromCenter: false,
-                width: 20,
-                height: 20
+                width: gameStatus.cellSize,
+                height: gameStatus.cellSize
             });
         }
     }
@@ -113,10 +116,12 @@ Attack = function(x, y, token) {
 }
 
 CanvasToXY = function(canvasX, canvasY) {
-    return [Math.floor(canvasX/20), Math.floor(canvasY/20)]
+    return [Math.floor(canvasX/gameStatus.cellSize), Math.floor(canvasY/gameStatus.cellSize)]
 }
 $(function() {
     var canvas = $('#my_canvas');
+    canvas[0].width = canvas.parent().width()
+    canvas[0].height = canvas[0].width
     setInterval(GetGameInfo, 200);
 
     $('#create').click(function() {
