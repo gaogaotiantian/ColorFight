@@ -206,6 +206,24 @@ def GetGameInfo():
         cell.Refresh(currTime)
     db.session.commit()
 
+    # only lock the user if there are cells to be refreshed
+    if len(cells) > 0:
+        users = UserDb.query.with_for_update().all()
+        userInfo = []
+        for user in users:
+            if not user.CheckDead():
+                cellNum = CellDb.query.filter_by(owner = user.id).count()
+                userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
+        db.session.commit()
+    else:
+        users = UserDb.query.all()
+        userInfo = []
+        for user in users:
+             cellNum = CellDb.query.filter_by(owner = user.id).count()
+             userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
+
+    retInfo['users'] = userInfo
+
     # Now give the actual info
     cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
     cellInfo = []
@@ -216,15 +234,6 @@ def GetGameInfo():
         cellInfo.append(c)
     retInfo['cells'] = cellInfo
 
-    users = UserDb.query.with_for_update().all()
-    userInfo = []
-    for user in users:
-        if not user.CheckDead():
-            cellNum = CellDb.query.filter_by(owner = user.id).count()
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
-    db.session.commit()
-
-    retInfo['users'] = userInfo
 
     return GetResp((200, retInfo))
 
