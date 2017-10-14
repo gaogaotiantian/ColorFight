@@ -96,7 +96,7 @@ class CellDb(db.Model):
 
     def Attack(self, uid, currTime):
         if self.is_taking == True:
-            return False, "This cell is being taken."
+            return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
         if self.owner != uid:
             for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -104,10 +104,10 @@ class CellDb(db.Model):
                 if adjc != None and adjc.owner == uid:
                     break
             else:
-                return False, "Cell position invalid or it's not adjacent to your cell."
+                return False, 1, "Cell position invalid or it's not adjacent to your cell."
         user = UserDb.query.get(uid)
         if user.cd_time > currTime:
-            return False, "You are in CD time!"
+            return False, 3, "You are in CD time!"
         self.attacker = uid
         self.attack_time = currTime
         self.finish_time = currTime + self.GetTakeTime(currTime)
@@ -240,7 +240,7 @@ def JoinGame():
         return GetResp((200, {'token':token, 'uid':availableId}))
     else:
         db.session.commit()
-        return GetResp((200, {'err_code':3, 'err_msg':'No cell available to start'}))
+        return GetResp((200, {'err_code':10, 'err_msg':'No cell available to start'}))
     
 @app.route('/attack', methods=['POST'])
 @require('cellx', 'celly', 'token')
@@ -261,11 +261,11 @@ def Attack():
     c = CellDb.query.filter_by(id = cellx + celly*width).with_for_update().first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, msg = c.Attack(uid, time.time())
+    success, err_code, msg = c.Attack(uid, time.time())
     if success:
         return GetResp((200, {"err_code":0}))
     else:
-        return GetResp((200, {"err_code":2, "err_msg":msg}))
+        return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/checktoken', methods=['POST'])
 @require('token')
