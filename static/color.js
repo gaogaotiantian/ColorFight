@@ -1,5 +1,5 @@
 //hostUrl = "http://localhost:8000/"
-hostUrl = "http://colorfight.herokuapp.com/"
+hostUrl = "https://colorfight.herokuapp.com/"
 var gameStatus = {"cellSize":20}
 var once = {'once':0};
 GetGameInfo = function() {
