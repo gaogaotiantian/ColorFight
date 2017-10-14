@@ -196,7 +196,7 @@ def GetGameInfo():
         info = InfoDb.query.get(0)
         if info == None:
             return GetResp((400, {"msg": "No game established"}))
-        flask.g.set('info', info)
+        flask.g.info = info
 
     currTime = time.time()
     retInfo = {}
