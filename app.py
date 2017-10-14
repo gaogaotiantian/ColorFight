@@ -66,6 +66,7 @@ class CellDb(db.Model):
     attacker      = db.Column(db.Integer, default = 0)
     attack_time   = db.Column(db.Float, default = 0)
     finish_time   = db.Column(db.Float, default = 0)
+    last_update   = db.Column(db.Float, default = 0)
     
     def Init(self, owner, currTime):
         self.owner = owner
@@ -93,6 +94,7 @@ class CellDb(db.Model):
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
+            self.last_update = currTime
 
     def Attack(self, uid, currTime):
         if self.is_taking == True:
@@ -112,6 +114,7 @@ class CellDb(db.Model):
         self.attack_time = currTime
         self.finish_time = currTime + self.GetTakeTime(currTime)
         self.is_taking = True
+        self.last_update = currTime
         db.session.commit()
         user = UserDb.query.with_for_update().get(uid)
         user.cd_time = self.finish_time
