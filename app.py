@@ -139,6 +139,7 @@ class UserDb(db.Model):
             return True
         return False
 
+
 db.create_all()
 
 # Utility
@@ -194,16 +195,25 @@ def GetGameInfo():
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
     currTime = time.time()
-    cells = CellDb.query.filter(CellDb.id < info.max_id).with_for_update().order_by(CellDb.id).all()
     retInfo = {}
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime}
-    cellInfo = []
+
+    # Refresh the cells that needs to be refreshed first because this will
+    # lock stuff
+    cells = CellDb.query.filter(CellDb.id < info.max_id).filter_by(CellDb.isTaking == True).filter(CellDb.finish_time < currTime).with_for_update().all()
+
     for cell in cells:
         cell.Refresh(currTime)
+    db.session.commit()
+
+    # Now give the actual info
+    cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
+    cellInfo = []
+
+    for cell in cells:
         takeTime = cell.GetTakeTime(currTime)
         c = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 'ot':cell.occupy_time, 'at':cell.attack_time, 't': takeTime, 'f':cell.finish_time}
         cellInfo.append(c)
-    db.session.commit()
     retInfo['cells'] = cellInfo
 
     users = UserDb.query.with_for_update().all()
