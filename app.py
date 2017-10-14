@@ -200,7 +200,7 @@ def GetGameInfo():
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter_by(CellDb.is_taking == True).filter(CellDb.finish_time < currTime).with_for_update().all()
+    cells = CellDb.query.filter(CellDb.id < info.max_id).filter_by(is_taking = True).filter(CellDb.finish_time < currTime).with_for_update().all()
 
     for cell in cells:
         cell.Refresh(currTime)
