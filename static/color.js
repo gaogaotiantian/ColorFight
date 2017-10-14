@@ -27,9 +27,13 @@ ListUsers = function(users) {
     }
 }
 DrawGame = function(canvas, info, cells) {
-    canvas[0].width = canvas.parent().width();
-    canvas[0].height = canvas[0].width;
-    gameStatus.cellSize = Math.floor(canvas[0].width/info['width']);
+    var w = canvas.parent().width();
+    if (w + canvas.offset().top > window.innerHeight) {
+        w = window.innerHeight - canvas.offset().top;
+    }
+    canvas[0].width = w;
+    canvas[0].height = w;
+    gameStatus.cellSize = Math.floor(w/info['width']);
     var width = info['width'];
     var height = info['height'];
     var currTime = info['time'];
