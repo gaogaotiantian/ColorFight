@@ -270,6 +270,8 @@ def GetGameInfo():
 
     retInfo['cells'] = lastCells
 
+    resp = GetResp((200, retInfo))
+
     if pr:
         pr.disable()
         s = StringIO.StringIO()
@@ -281,7 +283,7 @@ def GetGameInfo():
             pr_lastPrint = currTime
             print s.getvalue()
 
-    return GetResp((200, retInfo))
+    return resp
 
 @app.route('/joingame', methods=['POST'])
 @require('name')
