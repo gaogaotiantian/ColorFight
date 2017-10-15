@@ -23,8 +23,8 @@ ListUsers = function(users) {
     });
     for (idx in users) {
         user = users[idx];
-        $('#user_list').append($("<div>").addClass("col-2").append($("<span>").text(user['name']).css("color", HashIdToColor(user['id']))));
-        $('#user_list').append($("<div>").addClass("col-1").append($("<span>").text(user['cell_num'].toString()).css("color", HashIdToColor(user['id']))));
+        $('#user_list').append($("<div>").addClass("col-2").append($("<span>").text(user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))));
+        $('#user_list').append($("<div>").addClass("col-1").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
     }
 }
 DrawGame = function(canvas, info, cells) {
