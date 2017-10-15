@@ -23,7 +23,8 @@ ListUsers = function(users) {
     });
     for (idx in users) {
         user = users[idx];
-        $('#user_list').append($("<div>").addClass("col-3").append($("<span>").text(user['name'] + ' | ' + user['cell_num'].toString()).css("color", HashIdToColor(user['id']))));
+        $('#user_list').append($("<div>").addClass("col-2").append($("<span>").text(user['name']).css("color", HashIdToColor(user['id']))));
+        $('#user_list').append($("<div>").addClass("col-1").append($("<span>").text(user['cell_num'].toString()).css("color", HashIdToColor(user['id']))));
     }
 }
 DrawGame = function(canvas, info, cells) {
@@ -42,28 +43,21 @@ DrawGame = function(canvas, info, cells) {
         var owner = cell['o'];
         var attacker = cell['a'];
         if (cell['c'] == 0) {
-            canvas.drawRect( {
-                fillStyle: CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10)),
-                strokeStyle: 'white',
-                strokeWidth: 3,
-                x: cell.x*gameStatus.cellSize,
-                y: cell.y*gameStatus.cellSize,
-                fromCenter: false,
-                width: gameStatus.cellSize,
-                height: gameStatus.cellSize 
-            });
+            var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10));
         } else {
-            canvas.drawRect( {
-                fillStyle: CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at']))),
-                strokeStyle: 'white',
-                strokeWidth: 3,
-                x: cell.x*gameStatus.cellSize,
-                y: cell.y*gameStatus.cellSize,
-                fromCenter: false,
-                width: gameStatus.cellSize,
-                height: gameStatus.cellSize
-            });
+            var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
         }
+        canvas.drawRect( {
+            fillStyle: fillColor,
+            strokeStyle: 'white',
+            strokeWidth: 3,
+            x: cell.x*gameStatus.cellSize,
+            y: cell.y*gameStatus.cellSize,
+            fromCenter: false,
+            width: gameStatus.cellSize,
+            height: gameStatus.cellSize,
+            cornerRadius: 7
+        });
     }
 }
 
@@ -79,14 +73,24 @@ CombineColor = function(src, dest, per) {
         HexCombine(src.slice(3, 5), dest.slice(3, 5), per) +
         HexCombine(src.slice(5), dest.slice(5), per)
 }
+GetRandomColor = function() {
+    var r = ("0"+Math.floor(Math.random()*255).toString(16)).slice(-2).toUpperCase();
+    var g = ("0"+Math.floor(Math.random()*255).toString(16)).slice(-2).toUpperCase();
+    var b = ("0"+Math.floor(Math.random()*255).toString(16)).slice(-2).toUpperCase();
+
+    return '#' + r + g + b;
+}
+var colors = ['#DDDDDD', '#FF0000', '#00FF00', '#0000FF', '#00FFFF', 
+    '#FF00FF', '#FFFF00', '#FF8800', '#FF0088', '#88FF00', '#00FF88', 
+    '#8800FF', '#0088FF']
 HashIdToColor = function(id) {
-    var colors = ['#DDDDDD', '#FF0000', '#00FF00', '#0000FF', '#00FFFF', 
-        '#FF00FF', '#FFFF00', '#FF8800', '#FF0088', '#88FF00', '#00FF88', 
-        '#8800FF', '#0088FF']
     if (id < colors.length) {
         return colors[id];
     } else {
-        return "#000000";
+        while (colors.length <= id) {
+            colors.push(GetRandomColor());
+        }
+        return colors[id];
     }
 }
 CreateGame = function() {
@@ -95,16 +99,18 @@ CreateGame = function() {
 }
 
 JoinGame = function() {
-    $.ajax( {
-        url: hostUrl+"joingame",
-        method: "POST",
-        dataType: "json",
-        contentType: 'application/json;charset=UTF-8',
-        data: JSON.stringify({"name":$('#name').val()}),
-        success: function(msg) {
-            gameStatus.token = msg['token'];
-        },
-    })
+    if ($('#name').val() != '') {
+        $.ajax( {
+            url: hostUrl+"joingame",
+            method: "POST",
+            dataType: "json",
+            contentType: 'application/json;charset=UTF-8',
+            data: JSON.stringify({"name":$('#name').val()}),
+            success: function(msg) {
+                gameStatus.token = msg['token'];
+            },
+        })
+    }
 }
 
 Attack = function(x, y, token) {
