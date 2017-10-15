@@ -1,23 +1,35 @@
-//hostUrl = "http://localhost:8000/"
-hostUrl = "https://colorfight.herokuapp.com/"
+hostUrl = "http://localhost:8000/"
+//hostUrl = "https://colorfight.herokuapp.com/"
 var gameStatus = {"cellSize":20, 'cells':[]}
 var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
 GetGameInfo = function() {
     if (!fullInfo) {
-        $.get(hostUrl + "getgameinfo", 
-            function(data) {
+        $.ajax( {
+            url: hostUrl+"getgameinfo",
+            method: "POST",
+            dataType: "json",
+            contentType: 'application/json;charset=UTF-8',
+            data: JSON.stringify({'protocol':1}),
+            success: function(data) {
                 var gameInfo = data;
                 ListUsers(gameInfo['users']);
                 DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
                 gameStatus.cells = gameInfo['cells']
-            }
-        );
+            },
+        }).always(function() {
+            setTimeout(GetGameInfo, 200);
+        });
         fullInfo = true;
     } else {
-        $.get(hostUrl + "getgameinfo?timeAfter="+lastUpdate.toString(), 
-            function(data) {
+        $.ajax( {
+            url: hostUrl+"getgameinfo",
+            method: "POST",
+            dataType: "json",
+            contentType: 'application/json;charset=UTF-8',
+            data: JSON.stringify({'protocol':1, 'timeAfter':lastUpdate}),
+            success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
                 ListUsers(gameInfo['users']);
@@ -30,8 +42,10 @@ GetGameInfo = function() {
                 }
                 DrawGame($('#my_canvas'), gameInfo['info'], gameStatus['cells']);
                 lastUpdate = currTime;
-            }
-        );
+            },
+        }).always(function() {
+            setTimeout(GetGameInfo, 200);
+        });
     }
 }
 GetTakeTimeEq = function(timeDiff) {
@@ -172,8 +186,7 @@ $(function() {
     var canvas = $('#my_canvas');
     canvas[0].width = canvas.parent().width()
     canvas[0].height = canvas[0].width
-    setInterval(GetGameInfo, 200);
-
+    GetGameInfo();
     $('#create').click(function() {
         CreateGame();
     });

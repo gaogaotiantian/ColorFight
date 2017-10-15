@@ -24,6 +24,7 @@ lastUpdate = 0
 pr = cProfile.Profile()
 pr_lastPrint = 0
 pr_interval = 5
+protocolVersion = 1
 
 # ============================================================================
 #                                 Decoreator
@@ -58,6 +59,11 @@ def require(*required_args, **kw_req_args):
                         resp = flask.jsonify(msg="The reference post is not valid")
                         resp.status.code = 400
                         return resp
+                if "protocol" in kw_req_args:
+                    if "protocol" not in data:
+                        return GetResp((400, {"msg":"Need protocol!"}))
+                    if data['protocol'] < kw_req_args['protocol']:
+                        return GetResp((400, {"msg":"Protocol version too low"}))
             return func(*args, **kw)
         return wrapper
     return decorator
@@ -215,13 +221,15 @@ def StartGame():
     db.session.commit()
     return "Success"
 
-@app.route('/getgameinfo', methods=['GET'])
+@app.route('/getgameinfo', methods=['POST'])
 def GetGameInfo():
+    data = request.get_json()
     global pr
     if (pr):
         pr.enable()
-    timeAfter = request.args.get('timeAfter', '0')
-    timeAfter = float(timeAfter)
+    timeAfter = 0
+    if 'timeAfter' in data:
+        timeAfter = data['timeAfter']
 
     info = InfoDb.query.get(0)
     if info == None:
