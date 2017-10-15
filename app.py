@@ -19,6 +19,7 @@ app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
 lastCells = None
+lastUpdate = 0
 
 # ============================================================================
 #                                 Decoreator
@@ -68,6 +69,7 @@ class CellDb(db.Model):
     attacker      = db.Column(db.Integer, default = 0)
     attack_time   = db.Column(db.Float, default = 0)
     finish_time   = db.Column(db.Float, default = 0)
+    last_update   = db.Column(db.Float, default = 0)
     
     def Init(self, owner, currTime):
         self.attack_time = currTime
@@ -98,6 +100,7 @@ class CellDb(db.Model):
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
+            self.last_update = currTime
 
     def Attack(self, uid, currTime):
         if self.is_taking == True:
@@ -117,6 +120,7 @@ class CellDb(db.Model):
         self.attack_time = currTime
         self.finish_time = currTime + self.GetTakeTime(currTime)
         self.is_taking = True
+        self.last_update = currTime
         db.session.commit()
         user = UserDb.query.with_for_update().get(uid)
         user.cd_time = self.finish_time
@@ -205,6 +209,7 @@ def GetGameInfo():
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime}
 
     global lastCells
+    global lastUpdate
     if lastCells == None:
         cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
         cellInfo = []
@@ -220,7 +225,6 @@ def GetGameInfo():
 
     for cell in cells:
         cell.Refresh(currTime)
-        lastCells[cell.id] = cell.ToDict(currTime)
     db.session.commit()
 
     # only lock the user if there are cells to be refreshed
@@ -242,6 +246,11 @@ def GetGameInfo():
     retInfo['users'] = userInfo
 
     # Now update the actual info
+    cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.last_update > lastUpdate).all()
+    for cell in cells:
+        lastCells[cell.id] = cell.ToDict(currTime)
+    lastUpdate = currTime
+
     fakeCell = CellDb()
     for idx in range(len(lastCells)):
         if lastCells[idx]['c'] == 0:
