@@ -194,15 +194,6 @@ def StartGame():
 
 @app.route('/getgameinfo', methods=['GET'])
 def GetGameInfo():
-    timeafter = flask.request.args.get("timeafter")
-    if timeafter != None:
-        try:
-            timeafter = float(timeafter)
-        except:
-            timeafter = 0
-    else:
-         timeafter = 0
-
     info = flask.g.get('info', None)
     if info == None:
         info = InfoDb.query.get(0)
