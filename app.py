@@ -70,10 +70,10 @@ class CellDb(db.Model):
     finish_time   = db.Column(db.Float, default = 0)
     
     def Init(self, owner, currTime):
-        self.owner = owner
-        self.occupy_time = currTime
-        self.is_taking = False
-        self.attacker = 0
+        self.attack_time = currTime
+        self.is_taking = True
+        self.finish_time = currTime
+        self.attacker = owner
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
