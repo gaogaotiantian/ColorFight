@@ -15,8 +15,10 @@ else:
     DATABASE_URL = "postgresql+psycopg2://gaotian:password@localhost:5432/colorfight"
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
+lastCells = None
 
 # ============================================================================
 #                                 Decoreator
@@ -88,6 +90,9 @@ class CellDb(db.Model):
             takeTime = -1
         return takeTime
 
+    def ToDict(self, currTime):
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time}
+
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
             self.is_taking = False
@@ -116,7 +121,7 @@ class CellDb(db.Model):
         user = UserDb.query.with_for_update().get(uid)
         user.cd_time = self.finish_time
         db.session.commit()
-        return True, None
+        return True, None, None
 
 class InfoDb(db.Model):
     __tablename__ = 'info'
@@ -133,11 +138,11 @@ class UserDb(db.Model):
     cd_time       = db.Column(db.Integer)
 
     def CheckDead(self):
-        cells = CellDb.query.filter_by(owner = self.id).count()
-        if cells == 0:
+        if db.session.query(db.exists().where(CellDb.owner == self.id)).scalar():
+            return False
+        else:
             db.session.delete(self)
             return True
-        return False
 
 
 db.create_all()
@@ -199,12 +204,24 @@ def GetGameInfo():
     retInfo = {}
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime}
 
+    global lastCells
+    if lastCells == None:
+        cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
+        cellInfo = []
+
+        for cell in cells:
+            c = cell.ToDict(currTime)
+            cellInfo.append(c)
+        lastCells = cellInfo
+
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter_by(is_taking = True).filter(CellDb.finish_time < currTime).with_for_update().all()
+    cells = CellDb.query.filter(CellDb.id < info.max_id).filter_by(is_taking = True).with_for_update().all()
 
     for cell in cells:
         cell.Refresh(currTime)
+        takeTime = cell.GetTakeTime(currTime)
+        lastCells[cell.id] = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 'ot':cell.occupy_time, 'at':cell.attack_time, 't': takeTime, 'f':cell.finish_time}
     db.session.commit()
 
     # only lock the user if there are cells to be refreshed
@@ -213,7 +230,7 @@ def GetGameInfo():
         userInfo = []
         for user in users:
             if not user.CheckDead():
-                cellNum = CellDb.query.filter_by(owner = user.id).count()
+                cellNum = db.session.query(CellDb.id).filter_by(owner = user.id).count()
                 userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
         db.session.commit()
     else:
@@ -225,16 +242,12 @@ def GetGameInfo():
 
     retInfo['users'] = userInfo
 
-    # Now give the actual info
-    cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
-    cellInfo = []
+    # Now update the actual info
+    fakeCell = CellDb()
+    for idx in range(len(lastCells)):
+        lastCells[idx]['t'] = lastCells[idx]['ot'] + fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
 
-    for cell in cells:
-        takeTime = cell.GetTakeTime(currTime)
-        c = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 'ot':cell.occupy_time, 'at':cell.attack_time, 't': takeTime, 'f':cell.finish_time}
-        cellInfo.append(c)
-    retInfo['cells'] = cellInfo
-
+    retInfo['cells'] = lastCells
 
     return GetResp((200, retInfo))
 
