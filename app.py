@@ -220,8 +220,7 @@ def GetGameInfo():
 
     for cell in cells:
         cell.Refresh(currTime)
-        takeTime = cell.GetTakeTime(currTime)
-        lastCells[cell.id] = {'o':cell.owner, 'a':cell.attacker, 'c':int(cell.is_taking), 'x': cell.id%info.width, 'y':cell.id/info.height, 'ot':cell.occupy_time, 'at':cell.attack_time, 't': takeTime, 'f':cell.finish_time}
+        lastCells[cell.id] = cell.ToDict(currTime)
     db.session.commit()
 
     # only lock the user if there are cells to be refreshed
@@ -237,15 +236,21 @@ def GetGameInfo():
         users = UserDb.query.all()
         userInfo = []
         for user in users:
-             cellNum = CellDb.query.filter_by(owner = user.id).count()
-             userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
+            cellNum = db.session.query(CellDb.id).filter_by(owner = user.id).count()
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
 
     retInfo['users'] = userInfo
 
     # Now update the actual info
     fakeCell = CellDb()
     for idx in range(len(lastCells)):
-        lastCells[idx]['t'] = lastCells[idx]['ot'] + fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
+        if lastCells[idx]['c'] == 0:
+            if lastCells[idx]['o'] == 0:
+                lastCells[idx]['t'] = 2
+            else:
+                lastCells[idx]['t'] = fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
+        else:
+            lastCells[idx]['t'] = -1
 
     retInfo['cells'] = lastCells
 
