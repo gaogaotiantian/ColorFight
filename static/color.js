@@ -1,15 +1,55 @@
-//hostUrl = "http://localhost:8000/"
-hostUrl = "https://colorfight.herokuapp.com/"
-var gameStatus = {"cellSize":20}
+hostUrl = "http://localhost:8000/"
+//hostUrl = "https://colorfight.herokuapp.com/"
+var gameStatus = {"cellSize":20, 'cells':[]}
 var once = {'once':0};
+var lastUpdate = 0;
+var fullInfo = false;
 GetGameInfo = function() {
-    $.get(hostUrl + "getgameinfo", 
-        function(data) {
-            var gameInfo = data;
-            ListUsers(gameInfo['users']);
-            DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
+    if (!fullInfo) {
+        $.get(hostUrl + "getgameinfo", 
+            function(data) {
+                var gameInfo = data;
+                ListUsers(gameInfo['users']);
+                DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
+                gameStatus.cells = gameInfo['cells']
+            }
+        );
+        fullInfo = true;
+    } else {
+        $.get(hostUrl + "getgameinfo?timeAfter="+lastUpdate.toString(), 
+            function(data) {
+                var gameInfo = data;
+                var currTime = gameInfo['info']['time'];
+                ListUsers(gameInfo['users']);
+                for (var idx in gameInfo['cells']) {
+                    cell = gameInfo['cells'][idx];
+                    gameStatus['cells'][cell.x+cell.y*gameInfo['info']['width']] = cell;
+                }
+                for (var idx in gameStatus['cells']) {
+                    UpdateTakeTime(gameStatus['cells'][idx], currTime)
+                }
+                DrawGame($('#my_canvas'), gameInfo['info'], gameStatus['cells']);
+                lastUpdate = currTime;
+            }
+        );
+    }
+}
+GetTakeTimeEq = function(timeDiff) {
+   if (timeDiff <= 0) {
+       return 200
+   }
+   return 20*(Math.pow(2,(-timeDiff/20)))+2
+}
+UpdateTakeTime = function(cell, currTime) {
+    if (cell['c'] == 1) {
+        cell['t'] = -1;
+    } else {
+        if (cell['o'] == 0) {
+            cell['t'] = 1;
+        } else {
+            cell['t'] = GetTakeTimeEq(currTime - cell['ot'])
         }
-    );
+    }
 }
 ListUsers = function(users) {
     $('#user_list').empty();

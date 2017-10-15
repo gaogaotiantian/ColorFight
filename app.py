@@ -101,6 +101,11 @@ class CellDb(db.Model):
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
+            if self.owner != 0:
+                o = UserDb.query.get(self.owner)
+                o.dirty = True
+            a = UserDb.query.get(self.attacker)
+            a.dirty = True
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
@@ -144,6 +149,8 @@ class UserDb(db.Model):
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
     cd_time       = db.Column(db.Integer)
+    cells         = db.Column(db.Integer)
+    dirty         = db.Column(db.Boolean)
 
     def CheckDead(self):
         if db.session.query(db.exists().where(CellDb.owner == self.id)).scalar():
@@ -176,6 +183,7 @@ def GetResp(t):
 def StartGame():
     width = 30
     height = 30
+    currTime = time.time()
     i = InfoDb.query.get(0)
     if i == None:
         i = InfoDb(id = 0, width = width, height = height, max_id = width * height)
@@ -190,7 +198,7 @@ def StartGame():
         for x in range(width):
             c = CellDb.query.get(x + y * width)
             if c == None:
-                c = CellDb(id = x + y * width, x = x, y = y)
+                c = CellDb(id = x + y * width, x = x, y = y, lastUpdate = currTime)
                 db.session.add(c)
             else:
                 c.owner = 0
@@ -198,7 +206,12 @@ def StartGame():
                 c.is_taking = False
                 c.attacker = 0
                 c.attack_time = 0
+                c.last_update = currTime
                 db.session.commit()
+
+    users = UserDb.query.all()
+    for user in users:
+        db.session.delete(user)
     db.session.commit()
     return "Success"
 
@@ -207,6 +220,9 @@ def GetGameInfo():
     global pr
     if (pr):
         pr.enable()
+    timeAfter = request.args.get('timeAfter', '0')
+    timeAfter = float(timeAfter)
+
     info = InfoDb.query.get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
@@ -235,20 +251,18 @@ def GetGameInfo():
     db.session.commit()
 
     # only lock the user if there are cells to be refreshed
-    if len(cells) > 0:
-        users = UserDb.query.with_for_update().all()
-        userInfo = []
-        for user in users:
-            if not user.CheckDead():
-                cellNum = CellDb.query.filter_by(owner = user.id).count()
-                userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
-        db.session.commit()
-    else:
-        users = UserDb.query.all()
-        userInfo = []
-        for user in users:
+    users = UserDb.query.with_for_update().all()
+    userInfo = []
+    for user in users:
+        if user.dirty:
             cellNum = CellDb.query.filter_by(owner = user.id).count()
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
+            user.cells = cellNum
+            user.dirty = False
+        if user.cells == 0:
+            user.CheckDead()
+        else:
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells})
+    db.session.commit()
 
     retInfo['users'] = userInfo
 
@@ -258,17 +272,24 @@ def GetGameInfo():
         lastCells[cell.id] = cell.ToDict(currTime)
     lastUpdate = currTime
 
-    fakeCell = CellDb()
-    for idx in range(len(lastCells)):
-        if lastCells[idx]['c'] == 0:
-            if lastCells[idx]['o'] == 0:
-                lastCells[idx]['t'] = 2
+    retCells = []
+    if timeAfter == 0:
+        fakeCell = CellDb()
+        for idx in range(len(lastCells)):
+            if lastCells[idx]['c'] == 0:
+                if lastCells[idx]['o'] == 0:
+                    lastCells[idx]['t'] = 2
+                else:
+                    lastCells[idx]['t'] = fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
             else:
-                lastCells[idx]['t'] = fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
-        else:
-            lastCells[idx]['t'] = -1
+                lastCells[idx]['t'] = -1
+        retCells = lastCells
+    else:
+        changedCells = CellDb.query.filter(CellDb.last_update >= timeAfter).all()
+        for c in changedCells:
+            retCells.append(c.ToDict(currTime))
 
-    retInfo['cells'] = lastCells
+    retInfo['cells'] = retCells
 
     resp = GetResp((200, retInfo))
 
@@ -297,7 +318,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
