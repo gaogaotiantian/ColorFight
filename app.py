@@ -241,7 +241,7 @@ def GetGameInfo():
     retInfo['users'] = userInfo
 
     # Now give the actual info
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.last_update >= timeafter).order_by(CellDb.id).all()
+    cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
     cellInfo = []
 
     for cell in cells:
