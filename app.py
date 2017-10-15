@@ -3,6 +3,7 @@ import os
 import time
 import functools
 import base64
+import cProfile, pstats, StringIO
 
 import flask
 from flask import Flask, request, render_template
@@ -20,6 +21,9 @@ CORS(app)
 db = SQLAlchemy(app)
 lastCells = None
 lastUpdate = 0
+pr = cProfile.Profile()
+pr_lastPrint = 0
+pr_interval = 5
 
 # ============================================================================
 #                                 Decoreator
@@ -200,6 +204,9 @@ def StartGame():
 
 @app.route('/getgameinfo', methods=['GET'])
 def GetGameInfo():
+    global pr
+    if (pr):
+        pr.enable()
     info = InfoDb.query.get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
@@ -233,14 +240,14 @@ def GetGameInfo():
         userInfo = []
         for user in users:
             if not user.CheckDead():
-                cellNum = db.session.query(CellDb.id).filter_by(owner = user.id).count()
+                cellNum = CellDb.query.filter_by(owner = user.id).count()
                 userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
         db.session.commit()
     else:
         users = UserDb.query.all()
         userInfo = []
         for user in users:
-            cellNum = db.session.query(CellDb.id).filter_by(owner = user.id).count()
+            cellNum = CellDb.query.filter_by(owner = user.id).count()
             userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":cellNum})
 
     retInfo['users'] = userInfo
@@ -262,6 +269,17 @@ def GetGameInfo():
             lastCells[idx]['t'] = -1
 
     retInfo['cells'] = lastCells
+
+    if pr:
+        pr.disable()
+        s = StringIO.StringIO()
+        ps = pstats.Stats(pr, stream = s).sort_stats('cumulative')
+        global pr_interval
+        global pr_lastPrint
+        if pr_lastPrint + pr_interval < currTime:
+            ps.print_stats(30)
+            pr_lastPrint = currTime
+            print s.getvalue()
 
     return GetResp((200, retInfo))
 
