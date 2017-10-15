@@ -194,15 +194,6 @@ def StartGame():
 
 @app.route('/getgameinfo', methods=['GET'])
 def GetGameInfo():
-    timeafter = flask.request.args.get("timeafter")
-    if timeafter != None:
-        try:
-            timeafter = float(timeafter)
-        except:
-            timeafter = 0
-    else:
-         timeafter = 0
-
     info = flask.g.get('info', None)
     if info == None:
         info = InfoDb.query.get(0)
@@ -241,7 +232,7 @@ def GetGameInfo():
     retInfo['users'] = userInfo
 
     # Now give the actual info
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.last_update >= timeafter).order_by(CellDb.id).all()
+    cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
     cellInfo = []
 
     for cell in cells:
