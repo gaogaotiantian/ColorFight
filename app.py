@@ -191,12 +191,9 @@ def StartGame():
 
 @app.route('/getgameinfo', methods=['GET'])
 def GetGameInfo():
-    info = flask.g.get('info', None)
+    info = InfoDb.query.get(0)
     if info == None:
-        info = InfoDb.query.get(0)
-        if info == None:
-            return GetResp((400, {"msg": "No game established"}))
-        flask.g.set('info', info)
+        return GetResp((400, {"msg": "No game established"}))
 
     currTime = time.time()
     retInfo = {}
