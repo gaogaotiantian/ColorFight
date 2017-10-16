@@ -1,5 +1,5 @@
-//hostUrl = "https://colorfight.herokuapp.com/"
-hostUrl = "http://localhost:8000/"
+hostUrl = "https://colorfight.herokuapp.com/"
+//hostUrl = "http://localhost:8000/"
 CreateGame = function() {
     $.ajax( {
         url: hostUrl+"startgame",
