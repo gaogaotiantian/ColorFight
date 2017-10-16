@@ -1,5 +1,5 @@
-//hostUrl = "http://localhost:8000/"
-hostUrl = "https://colorfight.herokuapp.com/"
+hostUrl = "http://localhost:8000/"
+//hostUrl = "https://colorfight.herokuapp.com/"
 var gameStatus = {"cellSize":20, 'cells':[]}
 var once = {'once':0};
 var lastUpdate = 0;
@@ -15,6 +15,7 @@ GetGameInfo = function() {
             success: function(data) {
                 var gameInfo = data;
                 ListUsers(gameInfo['users']);
+                WriteTimeLeft(gameInfo['info']);
                 DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
                 gameStatus.cells = gameInfo['cells']
             },
@@ -33,6 +34,7 @@ GetGameInfo = function() {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
                 ListUsers(gameInfo['users']);
+                WriteTimeLeft(gameInfo['info']);
                 for (var idx in gameInfo['cells']) {
                     cell = gameInfo['cells'][idx];
                     gameStatus['cells'][cell.x+cell.y*gameInfo['info']['width']] = cell;
@@ -62,6 +64,17 @@ UpdateTakeTime = function(cell, currTime) {
             cell['t'] = 1;
         } else {
             cell['t'] = GetTakeTimeEq(currTime - cell['ot'])
+        }
+    }
+}
+WriteTimeLeft = function(info) {
+    if (info['end_time'] == 0) {
+        $("#time_left").text('');
+    } else {
+        if (info['end_time'] < info['time']) {
+            $('#time_left').text('Game ended!');
+        } else {
+            $('#time_left').text('Time left: '+parseInt(info['end_time'] - info['time']).toString());
         }
     }
 }
@@ -147,10 +160,6 @@ HashIdToColor = function(id) {
         return colors[id];
     }
 }
-CreateGame = function() {
-    $.get(hostUrl + "startgame", function(data) {
-    })
-}
 
 JoinGame = function() {
     if ($('#name').val() != '') {
@@ -187,9 +196,6 @@ $(function() {
     canvas[0].width = canvas.parent().width()
     canvas[0].height = canvas[0].width
     GetGameInfo();
-    $('#create').click(function() {
-        CreateGame();
-    });
 
     $('#join').click(function() {
         JoinGame();

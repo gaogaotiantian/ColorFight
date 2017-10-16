@@ -14,6 +14,11 @@ if os.environ.get('DATABASE_URL') != None:
     DATABASE_URL = os.environ.get('DATABASE_URL')
 else:
     DATABASE_URL = "postgresql+psycopg2://gaotian:password@localhost:5432/colorfight"
+if os.environ.get('ADMIN_PASSWORD') != None:
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
+else:
+    ADMIN_PASSWORD = ''
+
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
@@ -148,6 +153,7 @@ class InfoDb(db.Model):
     width         = db.Column(db.Integer, default = 0)
     height        = db.Column(db.Integer, default = 0)
     max_id        = db.Column(db.Integer, default = 0)         
+    end_time      = db.Column(db.Float, default = 0)
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -185,19 +191,30 @@ def GetResp(t):
 #======================================================================
 # Server side code 
 #======================================================================
-@app.route('/startgame', methods=['GET'])
+@app.route('/startgame', methods=['POST'])
+@require('admin_password', 'last_time')
 def StartGame():
+    data = request.get_json()
+    if data['admin_password'] != ADMIN_PASSWORD:
+        return GetResp((200, {"msg":"Fail"}))
     width = 30
     height = 30
     currTime = time.time()
-    i = InfoDb.query.get(0)
+    if data['last_time'] != 0:
+        endTime = currTime + data['last_time']
+    else:
+        endTime = 0
+    # dirty hack here, set end_time = 1 during initialization so Attack() and 
+    # Join() will not work while initialization
+    i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = 1)
         db.session.add(i)
     else:
         i.width = width
         i.height = height
         i.max_id = width*height
+        i.end_time = 1
     db.session.commit()
 
     for y in range(height):
@@ -219,7 +236,12 @@ def StartGame():
     for user in users:
         db.session.delete(user)
     db.session.commit()
-    return "Success"
+
+    i = InfoDb.query.with_for_update().get(0)
+    i.end_time = endTime;
+    db.session.commit()
+    
+    return GetResp((200, {"msg":"Success"}))
 
 @app.route('/getgameinfo', methods=['POST'])
 def GetGameInfo():
@@ -236,8 +258,9 @@ def GetGameInfo():
         return GetResp((400, {"msg": "No game established"}))
 
     currTime = time.time()
+
     retInfo = {}
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime}
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time}
 
     global lastCells
     global lastUpdate
@@ -258,7 +281,6 @@ def GetGameInfo():
         cell.Refresh(currTime)
     db.session.commit()
 
-    # only lock the user if there are cells to be refreshed
     users = UserDb.query.with_for_update().all()
     userInfo = []
     for user in users:
@@ -317,6 +339,9 @@ def GetGameInfo():
 @app.route('/joingame', methods=['POST'])
 @require('name')
 def JoinGame():
+    info = InfoDb.query.get(0)
+    if info.end_time != 0 and time.time() > info.end_time:
+        return GetResp((200, {'err_code':4, "err_msg":"Game is ended"}))
     data = request.get_json()
     users = UserDb.query.order_by(UserDb.id).with_for_update().all()
     availableId = 1
@@ -345,6 +370,10 @@ def Attack():
     u = UserDb.query.filter_by(token = data['token']).first()
     if u == None:
         return GetResp((400, {"msg":"user not valid"}))
+    info = InfoDb.query.get(0)
+    if info.end_time != 0 and time.time() > info.end_time:
+        return GetResp((200, {"err_code":4, "err_msg":"Game is ended"}))
+
     cellx = data['cellx']
     celly = data['celly']
     uid = u.id
@@ -377,3 +406,7 @@ def CheckToken():
 @app.route('/index.html')
 def Index():
     return render_template('index.html')
+
+@app.route('/admin.html')
+def Admin():
+    return render_template('admin.html')
