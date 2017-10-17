@@ -267,9 +267,10 @@ def GetGameInfo():
     if 'timeAfter' in data:
         timeAfter = data['timeAfter']
 
-    info = InfoDb.query.get(0)
+    info = InfoDb.query.with_for_update().get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
+    db.session.commit()
 
     retInfo = {}
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time}
