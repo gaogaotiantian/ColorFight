@@ -306,7 +306,7 @@ def GetGameInfo():
 
     retCells = []
 
-    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).all()
+    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).order_by(CellDb.id).all()
     for c in changedCells:
         retCells.append(c.ToDict(currTime))
 
