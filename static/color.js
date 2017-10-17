@@ -14,10 +14,12 @@ GetGameInfo = function() {
             data: JSON.stringify({'protocol':1}),
             success: function(data) {
                 var gameInfo = data;
+                var currTime = gameInfo['info']['time'];
                 ListUsers(gameInfo['users']);
                 WriteTimeLeft(gameInfo['info']);
                 DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
-                gameStatus.cells = gameInfo['cells']
+                gameStatus.cells = gameInfo['cells'];
+                lastUpdate = currTime;
             },
         }).always(function() {
             setTimeout(GetGameInfo, 200);

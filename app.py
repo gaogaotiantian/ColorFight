@@ -1,6 +1,6 @@
 # coding=utf-8
 import os
-import time
+import time, datetime
 import functools
 import base64
 import cProfile, pstats, StringIO
@@ -24,9 +24,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
-lastCells = None
-lastUpdate = 0
 pr = cProfile.Profile()
+pr = None
 pr_lastPrint = 0
 pr_interval = 5
 protocolVersion = 1
@@ -85,6 +84,7 @@ class CellDb(db.Model):
     attack_time   = db.Column(db.Float, default = 0)
     finish_time   = db.Column(db.Float, default = 0)
     last_update   = db.Column(db.Float, default = 0)
+    timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
     
     def Init(self, owner, currTime):
         self.attack_time = currTime
@@ -188,6 +188,20 @@ def GetResp(t):
     resp.status_code = t[0]
     return resp
 
+def GetCurrDbTime():
+    res = db.select([db.func.current_timestamp(type_=db.TIMESTAMP, bind=db.engine)]).execute()
+    for row in res:
+        return row[0]
+
+def GetCurrDbTimeSecs():
+    dbtime = GetCurrDbTime()
+    return dbtime, (GetCurrDbTime() - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
+
+def GetDateTimeFromSecs(secs):
+    dbtime = GetCurrDbTime()
+    return datetime.datetime.utcfromtimestamp(secs)
+
+
 #======================================================================
 # Server side code 
 #======================================================================
@@ -199,7 +213,7 @@ def StartGame():
         return GetResp((200, {"msg":"Fail"}))
     width = 30
     height = 30
-    currTime = time.time()
+    currTime = GetCurrDbTimeSecs()
     if data['last_time'] != 0:
         endTime = currTime + data['last_time']
     else:
@@ -208,14 +222,13 @@ def StartGame():
     # Join() will not work while initialization
     i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = 1)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime)
         db.session.add(i)
     else:
         i.width = width
         i.height = height
         i.max_id = width*height
-        i.end_time = 1
-    db.session.commit()
+        i.end_time = endTime
 
     for y in range(height):
         for x in range(width):
@@ -232,25 +245,23 @@ def StartGame():
                 c.attacker = 0
                 c.attack_time = 0
                 c.last_update = currTime
-    db.session.commit()
 
-    users = UserDb.query.all()
+    users = UserDb.query.with_for_update().all()
     for user in users:
         db.session.delete(user)
-    db.session.commit()
 
-    i = InfoDb.query.with_for_update().get(0)
-    i.end_time = endTime;
     db.session.commit()
 
     return GetResp((200, {"msg":"Success"}))
 
 @app.route('/getgameinfo', methods=['POST'])
 def GetGameInfo():
-    data = request.get_json()
     global pr
     if (pr):
         pr.enable()
+    currDbTime, currTime = GetCurrDbTimeSecs()
+    data = request.get_json()
+
     timeAfter = 0
     if 'timeAfter' in data:
         timeAfter = data['timeAfter']
@@ -259,21 +270,8 @@ def GetGameInfo():
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
 
-    currTime = time.time()
-
     retInfo = {}
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time}
-
-    global lastCells
-    global lastUpdate
-    if lastCells == None:
-        cells = CellDb.query.filter(CellDb.id < info.max_id).order_by(CellDb.id).all()
-        cellInfo = []
-
-        for cell in cells:
-            c = cell.ToDict(currTime)
-            cellInfo.append(c)
-        lastCells = cellInfo
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
@@ -298,28 +296,11 @@ def GetGameInfo():
 
     retInfo['users'] = userInfo
 
-    # Now update the actual info
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.last_update > lastUpdate).all()
-    for cell in cells:
-        lastCells[cell.id] = cell.ToDict(currTime)
-    lastUpdate = currTime
-
     retCells = []
-    if timeAfter == 0:
-        fakeCell = CellDb()
-        for idx in range(len(lastCells)):
-            if lastCells[idx]['c'] == 0:
-                if lastCells[idx]['o'] == 0:
-                    lastCells[idx]['t'] = 2
-                else:
-                    lastCells[idx]['t'] = fakeCell.GetTakeTimeEq(currTime - lastCells[idx]['ot'])
-            else:
-                lastCells[idx]['t'] = -1
-        retCells = lastCells
-    else:
-        changedCells = CellDb.query.filter(CellDb.last_update >= timeAfter).all()
-        for c in changedCells:
-            retCells.append(c.ToDict(currTime))
+
+    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).all()
+    for c in changedCells:
+        retCells.append(c.ToDict(currTime))
 
     retInfo['cells'] = retCells
 
@@ -342,7 +323,7 @@ def GetGameInfo():
 @require('name')
 def JoinGame():
     info = InfoDb.query.get(0)
-    if info.end_time != 0 and time.time() > info.end_time:
+    if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
         return GetResp((200, {'err_code':4, "err_msg":"Game is ended"}))
     data = request.get_json()
     users = UserDb.query.order_by(UserDb.id).with_for_update().all()
@@ -358,7 +339,7 @@ def JoinGame():
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
     if cell != None:
-        cell.Init(availableId, time.time())
+        cell.Init(availableId, GetCurrDbTimeSecs())
         db.session.commit()
         return GetResp((200, {'token':token, 'uid':availableId}))
     else:
@@ -373,7 +354,7 @@ def Attack():
     if u == None:
         return GetResp((400, {"msg":"user not valid"}))
     info = InfoDb.query.get(0)
-    if info.end_time != 0 and time.time() > info.end_time:
+    if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
         return GetResp((200, {"err_code":4, "err_msg":"Game is ended"}))
 
     cellx = data['cellx']
@@ -388,7 +369,7 @@ def Attack():
     c = CellDb.query.filter_by(id = cellx + celly*width).with_for_update().first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Attack(uid, time.time())
+    success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs())
     if success:
         return GetResp((200, {"err_code":0}))
     else:
