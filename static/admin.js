@@ -1,6 +1,6 @@
 hostUrl = "https://colorfight.herokuapp.com/"
 //hostUrl = "http://localhost:8000/"
-CreateGame = function() {
+CreateGame = function(soft) {
     $.ajax( {
         url: hostUrl+"startgame",
         method: "POST",
@@ -8,7 +8,8 @@ CreateGame = function() {
         contentType: 'application/json;charset=UTF-8',
         data: JSON.stringify({
             "admin_password":$('#admin_password').val(),
-            "last_time":parseInt($('#last_time').val())
+            "last_time":parseInt($('#last_time').val()),
+            "soft":soft
         }),
         success: function(msg) {
             console.log(msg)
@@ -18,6 +19,9 @@ CreateGame = function() {
 }
 $(function() {
     $('#create').click(function() {
-        CreateGame();
+        CreateGame(false);
     });
+    $('#restart').click(function() {
+        CreateGame(true);
+    })
 })
