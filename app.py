@@ -219,7 +219,7 @@ def StartGame():
 
     for y in range(height):
         for x in range(width):
-            c = CellDb.query.get(x + y * width)
+            c = CellDb.query.with_for_update().get(x + y * width)
             if c == None:
                 c = CellDb(id = x + y * width, x = x, y = y, lastUpdate = currTime)
                 db.session.add(c)
@@ -230,7 +230,7 @@ def StartGame():
                 c.attacker = 0
                 c.attack_time = 0
                 c.last_update = currTime
-                db.session.commit()
+    db.session.commit()
 
     users = UserDb.query.all()
     for user in users:
