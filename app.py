@@ -232,7 +232,7 @@ def StartGame():
                 c.attacker = 0
                 c.attack_time = 0
                 c.last_update = currTime
-                db.session.commit()
+    db.session.commit()
 
     users = UserDb.query.all()
     for user in users:
@@ -242,6 +242,9 @@ def StartGame():
     i = InfoDb.query.with_for_update().get(0)
     i.end_time = endTime;
     db.session.commit()
+
+    global lastUpdate
+    lastUpdate = 1
     
     return GetResp((200, {"msg":"Success"}))
 
