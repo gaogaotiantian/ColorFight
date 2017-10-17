@@ -193,9 +193,10 @@ def GetCurrDbTime():
     for row in res:
         return row[0]
 
-def GetCurrDbTimeSecs():
-    dbtime = GetCurrDbTime()
-    return dbtime, (GetCurrDbTime() - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
+def GetCurrDbTimeSecs(dbtime = None):
+    if dbtime == None:
+        dbtime = GetCurrDbTime()
+    return (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
 
 def GetDateTimeFromSecs(secs):
     dbtime = GetCurrDbTime()
@@ -259,7 +260,7 @@ def GetGameInfo():
     global pr
     if (pr):
         pr.enable()
-    currDbTime, currTime = GetCurrDbTimeSecs()
+    currTime = GetCurrDbTimeSecs()
     data = request.get_json()
 
     timeAfter = 0
