@@ -221,7 +221,7 @@ def StartGame():
         for x in range(width):
             c = CellDb.query.with_for_update().get(x + y * width)
             if c == None:
-                c = CellDb(id = x + y * width, x = x, y = y, lastUpdate = currTime)
+                c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime)
                 db.session.add(c)
             else:
                 c.owner = 0
@@ -243,9 +243,6 @@ def StartGame():
     i.end_time = endTime;
     db.session.commit()
 
-    global lastUpdate
-    lastUpdate = 1
-    
     return GetResp((200, {"msg":"Success"}))
 
 @app.route('/getgameinfo', methods=['POST'])
