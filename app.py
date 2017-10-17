@@ -225,12 +225,14 @@ def StartGame():
                 db.session.add(c)
             else:
                 c.owner = 0
+                c.x = x
+                c.y = y
                 c.occupy_time = 0
                 c.is_taking = False
                 c.attacker = 0
                 c.attack_time = 0
                 c.last_update = currTime
-    db.session.commit()
+                db.session.commit()
 
     users = UserDb.query.all()
     for user in users:
