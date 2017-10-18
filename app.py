@@ -193,9 +193,10 @@ def GetCurrDbTime():
     for row in res:
         return row[0]
 
-def GetCurrDbTimeSecs():
-    dbtime = GetCurrDbTime()
-    return dbtime, (GetCurrDbTime() - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
+def GetCurrDbTimeSecs(dbtime = None):
+    if dbtime == None:
+        dbtime = GetCurrDbTime()
+    return (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
 
 def GetDateTimeFromSecs(secs):
     dbtime = GetCurrDbTime()
@@ -211,6 +212,9 @@ def StartGame():
     data = request.get_json()
     if data['admin_password'] != ADMIN_PASSWORD:
         return GetResp((200, {"msg":"Fail"}))
+    softRestart = False
+    if "soft" in data and data["soft"] == True:
+        softRestart = True
     width = 30
     height = 30
     currTime = GetCurrDbTimeSecs()
@@ -230,21 +234,24 @@ def StartGame():
         i.max_id = width*height
         i.end_time = endTime
 
-    for y in range(height):
-        for x in range(width):
-            c = CellDb.query.with_for_update().get(x + y * width)
-            if c == None:
-                c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime)
-                db.session.add(c)
-            else:
-                c.owner = 0
-                c.x = x
-                c.y = y
-                c.occupy_time = 0
-                c.is_taking = False
-                c.attacker = 0
-                c.attack_time = 0
-                c.last_update = currTime
+    if softRestart:
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime})
+    else:
+        for y in range(height):
+            for x in range(width):
+                c = CellDb.query.with_for_update().get(x + y * width)
+                if c == None:
+                    c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime)
+                    db.session.add(c)
+                else:
+                    c.owner = 0
+                    c.x = x
+                    c.y = y
+                    c.occupy_time = 0
+                    c.is_taking = False
+                    c.attacker = 0
+                    c.attack_time = 0
+                    c.last_update = currTime
 
     users = UserDb.query.with_for_update().all()
     for user in users:
@@ -259,16 +266,17 @@ def GetGameInfo():
     global pr
     if (pr):
         pr.enable()
-    currDbTime, currTime = GetCurrDbTimeSecs()
+    currTime = GetCurrDbTimeSecs()
     data = request.get_json()
 
     timeAfter = 0
     if 'timeAfter' in data:
         timeAfter = data['timeAfter']
 
-    info = InfoDb.query.get(0)
+    info = InfoDb.query.with_for_update().get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
+    db.session.commit()
 
     retInfo = {}
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time}
@@ -298,7 +306,7 @@ def GetGameInfo():
 
     retCells = []
 
-    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).all()
+    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).order_by(CellDb.id).all()
     for c in changedCells:
         retCells.append(c.ToDict(currTime))
 
