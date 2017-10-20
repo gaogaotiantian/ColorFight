@@ -24,8 +24,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
-pr = cProfile.Profile()
-pr = None
+if os.environ.get('PROFILE') == 'True':
+    pr = cProfile.Profile()
+else:
+    pr = None
 pr_lastPrint = 0
 pr_interval = 5
 protocolVersion = 1
