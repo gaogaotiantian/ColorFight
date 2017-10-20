@@ -1,6 +1,10 @@
-hostUrl = "https://colorfight.herokuapp.com/"
 //hostUrl = "http://localhost:8000/"
+hostUrl = "https://colorfight.herokuapp.com/"
 CreateGame = function(soft) {
+    var aiOnly = false;
+    if ($('#ai_only').find(":selected").text() == 'Yes') {
+        aiOnly = true;
+    }
     $.ajax( {
         url: hostUrl+"startgame",
         method: "POST",
@@ -9,6 +13,7 @@ CreateGame = function(soft) {
         data: JSON.stringify({
             "admin_password":$('#admin_password').val(),
             "last_time":parseInt($('#last_time').val()),
+            "ai_only":aiOnly,
             "soft":soft
         }),
         success: function(msg) {

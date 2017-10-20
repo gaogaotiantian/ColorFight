@@ -154,6 +154,7 @@ class InfoDb(db.Model):
     height        = db.Column(db.Integer, default = 0)
     max_id        = db.Column(db.Integer, default = 0)         
     end_time      = db.Column(db.Float, default = 0)
+    ai_only       = db.Column(db.Boolean, default = False)
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -215,6 +216,10 @@ def StartGame():
     softRestart = False
     if "soft" in data and data["soft"] == True:
         softRestart = True
+    if "ai_only" in data and data["ai_only"] == True:
+        aiOnly = True
+    else:
+        aiOnly = False
     width = 30
     height = 30
     currTime = GetCurrDbTimeSecs()
@@ -226,13 +231,14 @@ def StartGame():
     # Join() will not work while initialization
     i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, ai_only = aiOnly)
         db.session.add(i)
     else:
         i.width = width
         i.height = height
         i.max_id = width*height
         i.end_time = endTime
+        i.ai_only = aiOnly
 
     if softRestart:
         CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime})
@@ -396,7 +402,12 @@ def CheckToken():
 @app.route('/')
 @app.route('/index.html')
 def Index():
-    return render_template('index.html')
+    i = InfoDb.query.get(0)
+    if i != None:
+        aiOnly = i.ai_only
+    else:
+        aiOnly = False
+    return render_template('index.html', aiOnly = aiOnly)
 
 @app.route('/admin.html')
 def Admin():
