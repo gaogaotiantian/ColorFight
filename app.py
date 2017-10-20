@@ -19,7 +19,7 @@ if os.environ.get('ADMIN_PASSWORD') != None:
 else:
     ADMIN_PASSWORD = ''
 if os.environ.get('PROFILE_INTERVAL') != None:
-    pr_interval = os.environ.get('PROFILE_INTERVAL') 
+    pr_interval = int(os.environ.get('PROFILE_INTERVAL'))
 else:
     pr_interval = 5
 
