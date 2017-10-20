@@ -18,6 +18,10 @@ if os.environ.get('ADMIN_PASSWORD') != None:
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
 else:
     ADMIN_PASSWORD = ''
+if os.environ.get('PROFILE_INTERVAL') != None:
+    pr_interval = os.environ.get('PROFILE_INTERVAL') 
+else:
+    pr_interval = 5
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -29,7 +33,6 @@ if os.environ.get('PROFILE') == 'True':
 else:
     pr = None
 pr_lastPrint = 0
-pr_interval = 5
 protocolVersion = 1
 
 # ============================================================================
