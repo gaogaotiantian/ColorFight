@@ -4,6 +4,8 @@ var gameStatus = {"cellSize":20, 'cells':[]}
 var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
+var attackImg = new Image();
+attackImg.src = '/static/attack.png';
 GetGameInfo = function() {
     if (!fullInfo) {
         $.ajax( {
@@ -136,7 +138,7 @@ DrawGame = function(canvas, info, cells) {
         });
         if (cell['c'] != 0) {
             canvas.drawImage( {
-                source: '/static/attack.png',
+                source: attackImg,
                 x: cell.x*gameStatus.cellSize+3,
                 y: cell.y*gameStatus.cellSize+3,
                 fromCenter: false,
