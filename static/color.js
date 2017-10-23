@@ -15,7 +15,7 @@ GetGameInfo = function() {
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
-                ListUsers(gameInfo['users']);
+                ListUsers(gameInfo['users'], currTime);
                 WriteTimeLeft(gameInfo['info']);
                 DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
                 gameStatus.cells = gameInfo['cells'];
@@ -35,7 +35,7 @@ GetGameInfo = function() {
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
-                ListUsers(gameInfo['users']);
+                ListUsers(gameInfo['users'], currTime);
                 WriteTimeLeft(gameInfo['info']);
                 for (var idx in gameInfo['cells']) {
                     cell = gameInfo['cells'][idx];
@@ -80,7 +80,7 @@ WriteTimeLeft = function(info) {
         }
     }
 }
-ListUsers = function(users) {
+ListUsers = function(users, currTime) {
     $('#user_list').empty();
     users = users.sort(function(a,b) { 
         if (a['cell_num'] > b['cell_num']) {
@@ -92,8 +92,15 @@ ListUsers = function(users) {
     });
     for (idx in users) {
         user = users[idx];
-        $('#user_list').append($("<div>").addClass("col-2").append($("<span>").text(user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))));
-        $('#user_list').append($("<div>").addClass("col-1").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
+        var $userRow = $("<div>").addClass("row");
+        if (user['cd_time'] > currTime) {
+            $userRow.append($("<div>").addClass("col-8").append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
+        } else {
+            $userRow.append($("<div>").addClass("col-8").append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
+        }
+        $userRow.append($("<div>").addClass("col-4").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
+        var $userDiv = $("<div>").addClass("col-3").append($userRow);
+        $('#user_list').append($userDiv);
     }
 }
 DrawGame = function(canvas, info, cells) {
