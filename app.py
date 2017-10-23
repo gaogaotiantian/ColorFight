@@ -170,12 +170,13 @@ class UserDb(db.Model):
     cells         = db.Column(db.Integer)
     dirty         = db.Column(db.Boolean)
 
-    def CheckDead(self):
-        if db.session.query(db.exists().where(CellDb.owner == self.id)).scalar():
-            return False
-        else:
-            db.session.delete(self)
-            return True
+    def Dead(self):
+        attackCells = CellDb.query.filter_by(attacker = self.id).with_for_update().all()
+        for cell in attackCells:
+            cell.is_taking = False
+            cell.attacker = 0
+        db.session.delete(self)
+        return True
 
 
 db.create_all()
@@ -308,7 +309,7 @@ def GetGameInfo():
             user.cells = cellNum
             user.dirty = False
         if user.cells == 0:
-            user.CheckDead()
+            user.Dead()
         else:
             userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells})
     db.session.commit()
