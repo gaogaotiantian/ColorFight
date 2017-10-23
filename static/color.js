@@ -126,14 +126,24 @@ DrawGame = function(canvas, info, cells) {
         canvas.drawRect( {
             fillStyle: fillColor,
             strokeStyle: 'white',
-            strokeWidth: 3,
+            strokeWidth: 4,
             x: cell.x*gameStatus.cellSize,
             y: cell.y*gameStatus.cellSize,
             fromCenter: false,
             width: gameStatus.cellSize,
             height: gameStatus.cellSize,
-            cornerRadius: 7
+            cornerRadius: 8
         });
+        if (cell['c'] != 0) {
+            canvas.drawImage( {
+                source: '/static/attack.png',
+                x: cell.x*gameStatus.cellSize+3,
+                y: cell.y*gameStatus.cellSize+3,
+                fromCenter: false,
+                width: gameStatus.cellSize-6,
+                height: gameStatus.cellSize-6
+            });
+        }
     }
 }
 
@@ -145,6 +155,9 @@ HexCombine = function(src, dest, per) {
 }
 
 CombineColor = function(src, dest, per) {
+    if (per < 0) {
+        per = 0;
+    }
     return "#" + HexCombine(src.slice(1, 3), dest.slice(1, 3), per) + 
         HexCombine(src.slice(3, 5), dest.slice(3, 5), per) +
         HexCombine(src.slice(5), dest.slice(5), per)
