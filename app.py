@@ -24,7 +24,7 @@ else:
     pr_interval = 5
 
 if os.environ.get('GAME_VERSION') != None:
-    GAME_VERSION = os.environ.get('VERSION')
+    GAME_VERSION = os.environ.get('GAME_VERSION')
 else:
     GAME_VERSION = 'mainline'
 
