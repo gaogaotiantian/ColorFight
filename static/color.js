@@ -120,20 +120,25 @@ DrawGame = function(canvas, info, cells) {
         var cell = cells[idx];
         var owner = cell['o'];
         var attacker = cell['a'];
+        var strokeColor = 'white';
         if (cell['c'] == 0) {
             var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10));
         } else {
             var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
         }
+
+        if ('ct' in cell && cell['ct'] == 'gold' ) {
+            strokeColor = '#999900'
+        }
         canvas.drawRect( {
             fillStyle: fillColor,
-            strokeStyle: 'white',
-            strokeWidth: 4,
+            strokeStyle: strokeColor,
+            strokeWidth: 3,
             x: cell.x*gameStatus.cellSize,
             y: cell.y*gameStatus.cellSize,
             fromCenter: false,
-            width: gameStatus.cellSize,
-            height: gameStatus.cellSize,
+            width: gameStatus.cellSize-3,
+            height: gameStatus.cellSize-3,
             cornerRadius: 8
         });
         if (cell['c'] != 0) {

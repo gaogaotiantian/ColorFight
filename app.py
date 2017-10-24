@@ -23,6 +23,11 @@ if os.environ.get('PROFILE_INTERVAL') != None:
 else:
     pr_interval = 5
 
+if os.environ.get('GAME_VERSION') != None:
+    GAME_VERSION = os.environ.get('VERSION')
+else:
+    GAME_VERSION = 'mainline'
+
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
@@ -90,6 +95,7 @@ class CellDb(db.Model):
     finish_time   = db.Column(db.Float, default = 0)
     last_update   = db.Column(db.Float, default = 0)
     timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
+    cell_type     = db.Column(db.String(15), default = "normal")
     
     def Init(self, owner, currTime):
         self.attack_time = currTime
@@ -113,7 +119,7 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time}
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type}
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
@@ -246,8 +252,10 @@ def StartGame():
         i.end_time = endTime
         i.ai_only = aiOnly
 
+    totalCells = width * height
+
     if softRestart:
-        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime})
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal'})
     else:
         for y in range(height):
             for x in range(width):
@@ -264,12 +272,19 @@ def StartGame():
                     c.attacker = 0
                     c.attack_time = 0
                     c.last_update = currTime
+                    c.cell_type = 'normal'
 
     users = UserDb.query.with_for_update().all()
     for user in users:
         db.session.delete(user)
 
     db.session.commit()
+
+    if GAME_VERSION == 'mainline':
+        goldenCells = CellDb.query.order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+        for cell in goldenCells:
+            cell.cell_type = 'gold'
+        db.session.commit()
 
     return GetResp((200, {"msg":"Success"}))
 
@@ -306,6 +321,8 @@ def GetGameInfo():
     for user in users:
         if user.dirty:
             cellNum = CellDb.query.filter_by(owner = user.id).count()
+            if GAME_VERSION == 'mainline':
+                cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
             user.cells = cellNum
             user.dirty = False
         if user.cells == 0:
@@ -357,7 +374,13 @@ def JoinGame():
     newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False)
     db.session.add(newUser)
     db.session.commit()
-    cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
+    if GAME_VERSION == 'release':
+        cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
+    elif GAME_VERSION == 'mainline':
+        cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
+        if cell == None:
+            cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
+
     if cell != None:
         cell.Init(availableId, GetCurrDbTimeSecs())
         db.session.commit()
