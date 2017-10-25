@@ -144,16 +144,15 @@ class CellDb(db.Model):
                     break
             else:
                 return False, 1, "Cell position invalid or it's not adjacent to your cell."
-        user = UserDb.query.get(uid)
+        user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
+            db.session.commit()
             return False, 3, "You are in CD time!"
         self.attacker = uid
         self.attack_time = currTime
         self.finish_time = currTime + self.GetTakeTime(currTime)
         self.is_taking = True
         self.last_update = currTime
-        db.session.commit()
-        user = UserDb.query.with_for_update().get(uid)
         user.cd_time = self.finish_time
         db.session.commit()
         return True, None, None
@@ -409,7 +408,7 @@ def Attack():
     if (cellx < 0 or cellx >= width or 
             celly < 0 or celly >= height):
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
-    c = CellDb.query.filter_by(id = cellx + celly*width).with_for_update().first()
+    c = CellDb.query.get(cellx + celly*width).with_for_update()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
     success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs())
