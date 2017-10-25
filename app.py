@@ -408,7 +408,7 @@ def Attack():
     if (cellx < 0 or cellx >= width or 
             celly < 0 or celly >= height):
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
-    c = CellDb.query.get(cellx + celly*width).with_for_update()
+    c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
     success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs())
