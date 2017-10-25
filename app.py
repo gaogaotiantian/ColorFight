@@ -137,20 +137,32 @@ class CellDb(db.Model):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
-        if self.owner != uid:
+        adjCells = 0
+        if GAME_VERSION == "release":
+            if self.owner != uid:
+                for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
+                    if adjc != None and adjc.owner == uid:
+                        break
+                else:
+                    return False, 1, "Cell position invalid or it's not adjacent to your cell."
+        elif GAME_VERSION == "mainline":
             for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
                 if adjc != None and adjc.owner == uid:
-                    break
-            else:
+                    adjCells += 1
+            if self.owner != uid and adjCells == 0:
                 return False, 1, "Cell position invalid or it's not adjacent to your cell."
+
+
+
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             db.session.commit()
             return False, 3, "You are in CD time!"
         self.attacker = uid
         self.attack_time = currTime
-        self.finish_time = currTime + self.GetTakeTime(currTime)
+        self.finish_time = currTime + self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5
         self.is_taking = True
         self.last_update = currTime
         user.cd_time = self.finish_time
