@@ -65,7 +65,7 @@ UpdateTakeTime = function(cell, currTime) {
         cell['t'] = -1;
     } else {
         if (cell['o'] == 0) {
-            cell['t'] = 1;
+            cell['t'] = 2;
         } else {
             cell['t'] = GetTakeTimeEq(currTime - cell['ot'])
         }
