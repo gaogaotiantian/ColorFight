@@ -1,10 +1,13 @@
 //hostUrl = "http://localhost:8000/"
 hostUrl = "https://colorfight.herokuapp.com/"
-var gameStatus = {"cellSize":20, 'cells':[]}
+var gameStatus = {"cellSize":20, 'cells':[], 'info':[]}
 var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
 var attackImg = new Image();
+var lastCurrTime = 0;
+var lastClientTime = 0;
+
 attackImg.src = '/static/attack.png';
 GetGameInfo = function() {
     if (!fullInfo) {
@@ -19,9 +22,12 @@ GetGameInfo = function() {
                 var currTime = gameInfo['info']['time'];
                 ListUsers(gameInfo['users'], currTime);
                 WriteTimeLeft(gameInfo['info']);
-                DrawGame($('#my_canvas'), gameInfo['info'], gameInfo['cells']);
                 gameStatus.cells = gameInfo['cells'];
+                gameStatus.info = gameInfo['info'];
                 lastUpdate = currTime;
+                lastCurrTime = currTime;
+                var d = new Date();
+                lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
             setTimeout(GetGameInfo, 200);
@@ -46,8 +52,11 @@ GetGameInfo = function() {
                 for (var idx in gameStatus['cells']) {
                     UpdateTakeTime(gameStatus['cells'][idx], currTime)
                 }
-                DrawGame($('#my_canvas'), gameInfo['info'], gameStatus['cells']);
+                gameStatus.info = gameInfo['info'];
                 lastUpdate = currTime;
+                lastCurrTime = currTime;
+                var d = new Date();
+                lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
             setTimeout(GetGameInfo, 200);
@@ -105,7 +114,15 @@ ListUsers = function(users, currTime) {
         $('#user_list').append($userDiv);
     }
 }
-DrawGame = function(canvas, info, cells) {
+DrawGame = function() {
+    var canvas = $('#my_canvas');
+    var info = gameStatus['info'];
+    var cells = gameStatus['cells'];
+
+    var d = new Date();
+    clientTime = d.getTime()/1000.0;
+
+    var currTime = lastCurrTime + clientTime - lastClientTime;
     var w = canvas.parent().width();
     if (w + canvas.offset().top > window.innerHeight) {
         w = window.innerHeight - canvas.offset().top;
@@ -115,7 +132,7 @@ DrawGame = function(canvas, info, cells) {
     gameStatus.cellSize = Math.floor(w/info['width']);
     var width = info['width'];
     var height = info['height'];
-    var currTime = info['time'];
+
     for (idx in cells) {
         var cell = cells[idx];
         var owner = cell['o'];
@@ -236,5 +253,6 @@ $(function() {
             Attack(xy[0], xy[1], gameStatus.token);
         }
     })
+    setInterval(DrawGame, 50);
 })
 
