@@ -110,7 +110,7 @@ ListUsers = function(users, currTime) {
             $userRow.append($("<div>").addClass("col-8").append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         }
         $userRow.append($("<div>").addClass("col-4").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
-        var $userDiv = $("<div>").addClass("col-3").append($userRow);
+        var $userDiv = $("<div>").addClass("col-6 col-md-3").append($userRow);
         $('#user_list').append($userDiv);
     }
 }

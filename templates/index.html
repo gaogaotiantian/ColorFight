@@ -17,10 +17,8 @@
 <body>
   <div class="container">
     {% if not aiOnly %}
-    <div class="row">
-      <div class="col-8">
-      </div>
-      <div class="col-4 text-right input-group pull-right">
+    <div class="row justify-content-end">
+      <div class="col-12 col-md-4 text-right input-group pull-right">
         <!-- <button id="create">Create Game</button> -->
         <input id="name" class="form-control" type="text" placeholder="Username"></input>
         <div class="input-group-btn">
@@ -33,7 +31,7 @@
     <div class="row">
       <div class="col">
         <div class="row">
-          <div id="title" style="margin:10px" class="col-2 hidden-xs align-middle text-center">
+          <div id="title" style="margin:10px" class="col-2 d-none d-md-block align-middle text-center">
             <h3 style="word-wrap:break-word">ColorFight!</h3>
           </div>
           <div class="col">
@@ -45,7 +43,7 @@
         <hr>
 
         <div class="row">
-          <div id="rule_list" class="col-2 hidden-xs">
+          <div id="rule_list" class="col-2 d-none d-md-block">
             <div class="row">
               <div class="col text-center">
                 <h3>Rules!</h3>
