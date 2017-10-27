@@ -193,9 +193,10 @@ GetRandomColor = function() {
 
     return '#' + r + g + b;
 }
-var colors = ['#DDDDDD', '#FF0000', '#00FF00', '#0000FF', '#00FFFF', 
-    '#FF00FF', '#FFFF00', '#FF8800', '#FF0088', '#88FF00', '#00FF88', 
-    '#8800FF', '#0088FF']
+//https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
+var colors = ['#DDDDDD', '#E6194B', '#3Cb44B', '#FFE119', '#0082C8', '#F58231', 
+    '#911EB4', '#46F0F0', '#F032E6', '#D2F53C', '#FABEBE', '#008080', 
+    '#AA6E28', '#800000', '#AAFFC3', '#808000', '#000080', '#E6BEFF']
 HashIdToColor = function(id) {
     if (id < colors.length) {
         return colors[id];
