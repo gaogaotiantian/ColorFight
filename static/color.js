@@ -105,11 +105,11 @@ ListUsers = function(users, currTime) {
         user = users[idx];
         var $userRow = $("<div>").addClass("row");
         if (user['cd_time'] > currTime) {
-            $userRow.append($("<div>").addClass("col-8").append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
+            $userRow.append($("<div>").addClass("col-9 user-col").append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         } else {
-            $userRow.append($("<div>").addClass("col-8").append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
+            $userRow.append($("<div>").addClass("col-9 user-col").append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         }
-        $userRow.append($("<div>").addClass("col-4").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
+        $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
         var $userDiv = $("<div>").addClass("col-6 col-md-3").append($userRow);
         $('#user_list').append($userDiv);
     }

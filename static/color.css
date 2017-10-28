@@ -1,8 +1,10 @@
 .user_name {
     font-family:"Comic Sans MS";
     font-weight: bold;
-    font-size:110%;
+    font-size:100%;
     text-shadow:
          0px  0px 2px #000; 
 }
-
+.user-col {
+    overflow: visible;
+}
