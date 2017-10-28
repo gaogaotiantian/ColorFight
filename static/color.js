@@ -268,6 +268,9 @@ $(function() {
     $('body').on("mouseleave", '.user-row', function() {
         gameStatus['selectId'] = -1;
     })
+    $('body').on("mouseleave", '#user_list', function() {
+        gameStatus['selectId'] = -1;
+    })
     setInterval(DrawGame, 50);
 })
 
