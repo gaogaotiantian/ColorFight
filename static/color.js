@@ -1,6 +1,6 @@
 //hostUrl = "http://localhost:8000/"
 hostUrl = "https://colorfight.herokuapp.com/"
-var gameStatus = {"cellSize":20, 'cells':[], 'info':[]}
+var gameStatus = {"cellSize":20, 'cells':[], 'info':[], 'selectId': -1}
 var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
@@ -103,7 +103,7 @@ ListUsers = function(users, currTime) {
     });
     for (idx in users) {
         user = users[idx];
-        var $userRow = $("<div>").addClass("row");
+        var $userRow = $("<div>").addClass("row user-row").attr("uid", user['id']);
         if (user['cd_time'] > currTime) {
             $userRow.append($("<div>").addClass("col-9 user-col").append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         } else {
@@ -138,10 +138,17 @@ DrawGame = function() {
         var owner = cell['o'];
         var attacker = cell['a'];
         var strokeColor = 'white';
-        if (cell['c'] == 0) {
-            var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10));
+        var strokeWidth = 3;
+        if (gameStatus['selectId'] == owner) {
+            var fillColor = HashIdToColor(owner);
+            strokeWidth = 2;
         } else {
-            var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
+            if (cell['c'] == 0) {
+                var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10));
+            } else {
+                if (gameStatus['selectId'] == owner)
+                var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
+            }
         }
 
         if ('ct' in cell && cell['ct'] == 'gold' ) {
@@ -150,12 +157,12 @@ DrawGame = function() {
         canvas.drawRect( {
             fillStyle: fillColor,
             strokeStyle: strokeColor,
-            strokeWidth: 3,
+            strokeWidth: strokeWidth,
             x: cell.x*gameStatus.cellSize,
             y: cell.y*gameStatus.cellSize,
             fromCenter: false,
-            width: gameStatus.cellSize-3,
-            height: gameStatus.cellSize-3,
+            width: gameStatus.cellSize-strokeWidth,
+            height: gameStatus.cellSize-strokeWidth,
             cornerRadius: 8
         });
         if (cell['c'] != 0) {
@@ -253,6 +260,13 @@ $(function() {
             xy = CanvasToXY(e.offsetX, e.offsetY);
             Attack(xy[0], xy[1], gameStatus.token);
         }
+    })
+
+    $('body').on("mouseenter", '.user-row', function() {
+        gameStatus['selectId'] = $(this).attr("uid");
+    })
+    $('body').on("mouseleave", '.user-row', function() {
+        gameStatus['selectId'] = -1;
     })
     setInterval(DrawGame, 50);
 })
