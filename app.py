@@ -123,6 +123,7 @@ class CellDb(db.Model):
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
+            # Do no lock the user here, it would dead lock
             if self.owner != 0:
                 o = UserDb.query.get(self.owner)
                 o.dirty = True
