@@ -144,7 +144,7 @@ DrawGame = function() {
             strokeWidth = 2;
         } else {
             if (cell['c'] == 0) {
-                var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/10));
+                var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/8));
             } else {
                 if (gameStatus['selectId'] == owner)
                 var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
@@ -202,8 +202,8 @@ GetRandomColor = function() {
 }
 //https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
 var colors = ['#DDDDDD', '#E6194B', '#3Cb44B', '#FFE119', '#0082C8', '#F58231', 
-    '#911EB4', '#46F0F0', '#F032E6', '#D2F53C', '#FABEBE', '#008080', 
-    '#AA6E28', '#800000', '#AAFFC3', '#808000', '#000080', '#E6BEFF']
+    '#911EB4', '#46F0F0', '#F032E6', '#D2F53C', '#008080', 
+    '#AA6E28', '#800000', '#AAFFC3', '#808000', '#000080', '#FABEBE', '#E6BEFF']
 HashIdToColor = function(id) {
     if (id < colors.length) {
         return colors[id];
