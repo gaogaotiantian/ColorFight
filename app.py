@@ -311,6 +311,8 @@ def GetGameInfo():
     timeAfter = 0
     if 'timeAfter' in data:
         timeAfter = data['timeAfter']
+    else:
+        print('Info! Get a full cell request.')
 
     info = InfoDb.query.with_for_update().get(0)
     if info == None:
