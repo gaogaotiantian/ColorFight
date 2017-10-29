@@ -146,7 +146,6 @@ DrawGame = function() {
             if (cell['c'] == 0) {
                 var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/8));
             } else {
-                if (gameStatus['selectId'] == owner)
                 var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
             }
         }
