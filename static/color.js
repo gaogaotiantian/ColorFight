@@ -104,13 +104,23 @@ ListUsers = function(users, currTime) {
     for (idx in users) {
         user = users[idx];
         var $userRow = $("<div>").addClass("row user-row").attr("uid", user['id']);
+        var $energyRow = $("<div>").addClass("progress");
         if (user['cd_time'] > currTime) {
             $userRow.append($("<div>").addClass("col-9 user-col").append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         } else {
             $userRow.append($("<div>").addClass("col-9 user-col").append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
         }
         $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
-        var $userDiv = $("<div>").addClass("col-12").append($userRow);
+
+        if (gameStatus.info.game_version == 'mainline') {
+            var barWidth = user['energy'].toString() + '%';
+            console.log(barWidth)
+            $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":barWidth, "height":"3px"}));
+            var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow).append($energyRow);
+        } else {
+            var $userDiv = $("<div>").addClass("col-12").append($userRow);
+            
+        }
         $('#user_list').append($userDiv);
     }
 }
@@ -153,17 +163,30 @@ DrawGame = function() {
         if ('ct' in cell && cell['ct'] == 'gold' ) {
             strokeColor = '#999900'
         }
-        canvas.drawRect( {
-            fillStyle: fillColor,
-            strokeStyle: strokeColor,
-            strokeWidth: strokeWidth,
-            x: cell.x*gameStatus.cellSize,
-            y: cell.y*gameStatus.cellSize,
-            fromCenter: false,
-            width: gameStatus.cellSize-strokeWidth,
-            height: gameStatus.cellSize-strokeWidth,
-            cornerRadius: 8
-        });
+        if ('ct' in cell && cell['ct'] == 'energy') {
+            canvas.drawPolygon( {
+                fillStyle: fillColor,
+                strokeStyle: '#4444AA',
+                strokeWidth: strokeWidth,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
+                fromCenter: false,
+                radius: (gameStatus.cellSize-strokeWidth)/2,
+                sides: 6
+            })
+        } else {
+            canvas.drawRect( {
+                fillStyle: fillColor,
+                strokeStyle: strokeColor,
+                strokeWidth: strokeWidth,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
+                fromCenter: false,
+                width: gameStatus.cellSize-strokeWidth,
+                height: gameStatus.cellSize-strokeWidth,
+                cornerRadius: 8
+            });
+        }
         if (cell['c'] != 0) {
             canvas.drawImage( {
                 source: attackImg,

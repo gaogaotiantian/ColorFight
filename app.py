@@ -173,6 +173,7 @@ class InfoDb(db.Model):
     max_id        = db.Column(db.Integer, default = 0)         
     end_time      = db.Column(db.Float, default = 0)
     ai_only       = db.Column(db.Boolean, default = False)
+    last_update   = db.Column(db.Float, default = 0)
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -182,6 +183,7 @@ class UserDb(db.Model):
     cd_time       = db.Column(db.Integer)
     cells         = db.Column(db.Integer)
     dirty         = db.Column(db.Boolean)
+    energy        = db.Column(db.Integer)
 
     def Dead(self):
         attackCells = CellDb.query.filter_by(attacker = self.id).with_for_update().all()
@@ -250,7 +252,7 @@ def StartGame():
     # Join() will not work while initialization
     i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, ai_only = aiOnly)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, ai_only = aiOnly, last_update = currTime)
         db.session.add(i)
     else:
         i.width = width
@@ -258,6 +260,7 @@ def StartGame():
         i.max_id = width*height
         i.end_time = endTime
         i.ai_only = aiOnly
+        i.last_update = currTime
 
     totalCells = width * height
 
@@ -290,6 +293,12 @@ def StartGame():
     goldenCells = CellDb.query.order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
     for cell in goldenCells:
         cell.cell_type = 'gold'
+
+    if GAME_VERSION == 'mainline':
+        energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+        for cell in energyCells:
+            cell.cell_type = 'energy'
+
     db.session.commit()
 
     return GetResp((200, {"msg":"Success"}))
@@ -308,13 +317,18 @@ def GetGameInfo():
     else:
         print('Info! Get a full cell request.')
 
+    timeDiff = 0
+
     info = InfoDb.query.with_for_update().get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
+    if int(currTime) - int(info.last_update) > 0:
+        timeDiff = int(currTime) - int(info.last_update)
+    info.last_update = max(currTime, info.last_update)    
     db.session.commit()
 
     retInfo = {}
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time}
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'game_version':GAME_VERSION}
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
@@ -335,7 +349,15 @@ def GetGameInfo():
         if user.cells == 0:
             user.Dead()
         else:
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells})
+            if timeDiff > 0:
+                energyCellNum = CellDb.query.filter_by(owner = user.id, cell_type = 'energy').count()
+                if energyCellNum > 0:
+                    user.energy = user.energy + timeDiff * energyCellNum
+                    user.energy = min(100, user.energy)
+                else:
+                    user.energy = user.energy - 1
+                    user.energy = max(user.energy, 0)
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "energy":user.energy})
     db.session.commit()
 
     retInfo['users'] = userInfo
@@ -383,7 +405,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False, energy = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
