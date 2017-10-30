@@ -18,6 +18,10 @@ if os.environ.get('ADMIN_PASSWORD') != None:
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
 else:
     ADMIN_PASSWORD = ''
+if os.environ.get('ROOM_PASSWORD') != None and os.environ.get('ROOM_PASSWORD') != '':
+    ROOM_PASSWORD = os.environ.get('ROOM_PASSWORD') 
+else:
+    ROOM_PASSWORD = None
 if os.environ.get('PROFILE_INTERVAL') != None:
     pr_interval = int(os.environ.get('PROFILE_INTERVAL'))
 else:
@@ -375,6 +379,11 @@ def JoinGame():
     if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
         return GetResp((200, {'err_code':4, "err_msg":"Game is ended"}))
     data = request.get_json()
+
+    if ROOM_PASSWORD != None:
+        if 'password' not in data or data['password'] != ROOM_PASSWORD:
+            return GetResp((403, {'err_code':11, "err_msg":"You need password to enter the room"}))
+
     users = UserDb.query.order_by(UserDb.id).with_for_update().all()
     availableId = 1
     for u in users:
