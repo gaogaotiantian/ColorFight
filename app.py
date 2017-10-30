@@ -143,21 +143,12 @@ class CellDb(db.Model):
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
         adjCells = 0
-        if GAME_VERSION == "release":
-            if self.owner != uid:
-                for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
-                    if adjc != None and adjc.owner == uid:
-                        break
-                else:
-                    return False, 1, "Cell position invalid or it's not adjacent to your cell."
-        elif GAME_VERSION == "mainline":
-            for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
-                if adjc != None and adjc.owner == uid:
-                    adjCells += 1
-            if self.owner != uid and adjCells == 0:
-                return False, 1, "Cell position invalid or it's not adjacent to your cell."
+        for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
+            if adjc != None and adjc.owner == uid:
+                adjCells += 1
+        if self.owner != uid and adjCells == 0:
+            return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
 
 
@@ -296,11 +287,10 @@ def StartGame():
 
     db.session.commit()
 
-    if GAME_VERSION == 'mainline':
-        goldenCells = CellDb.query.order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
-        for cell in goldenCells:
-            cell.cell_type = 'gold'
-        db.session.commit()
+    goldenCells = CellDb.query.order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+    for cell in goldenCells:
+        cell.cell_type = 'gold'
+    db.session.commit()
 
     return GetResp((200, {"msg":"Success"}))
 
@@ -339,8 +329,7 @@ def GetGameInfo():
     for user in users:
         if user.dirty:
             cellNum = CellDb.query.filter_by(owner = user.id).count()
-            if GAME_VERSION == 'mainline':
-                cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
+            cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
             user.cells = cellNum
             user.dirty = False
         if user.cells == 0:
@@ -397,12 +386,9 @@ def JoinGame():
     newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False)
     db.session.add(newUser)
     db.session.commit()
-    if GAME_VERSION == 'release':
+    cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
+    if cell == None:
         cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
-    elif GAME_VERSION == 'mainline':
-        cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
-        if cell == None:
-            cell = CellDb.query.filter_by(is_taking = False).order_by(db.func.random()).with_for_update().limit(1).first()
 
     if cell != None:
         cell.Init(availableId, GetCurrDbTimeSecs())
