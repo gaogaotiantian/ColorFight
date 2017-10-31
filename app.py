@@ -4,6 +4,7 @@ import time, datetime
 import functools
 import base64
 import cProfile, pstats, StringIO
+import random
 
 import flask
 from flask import Flask, request, render_template
@@ -44,6 +45,11 @@ else:
 pr_lastPrint = 0
 protocolVersion = 1
 
+energyShop = {
+    "base": 60,
+    "attack": 2
+}
+
 # ============================================================================
 #                                 Decoreator
 # ============================================================================ 
@@ -61,22 +67,27 @@ def require(*required_args, **kw_req_args):
                     resp = flask.jsonify(code=400, msg="wrong args! need "+arg)
                     resp.status_code = 400
                     return resp
+                if arg == 'token':
+                    u = UserDb.query.filter_by(token = data['token']).first()
+                    if u == None:
+                        return GetResp((400, {"msg":"user not valid"}))
+
             if kw_req_args != None:
-                if "login" in kw_req_args:
-                    assert('token' in required_args)
-                    username = data[kw_req_args["login"]]
-                    token = data['token']
-                    u = User(username = username, token = token)
-                    if not u.valid:
-                        resp = flask.jsonify(msg="This action requires login!")
-                        resp.status_code = 401
-                        return resp
-                if "postValid" in kw_req_args:
-                    p = Post()
-                    if not p.Exist(data[kw_req_args["postValid"]]):
-                        resp = flask.jsonify(msg="The reference post is not valid")
-                        resp.status.code = 400
-                        return resp
+                if "action" in kw_req_args:
+                    if kw_req_args['action'] == True:
+                        info = InfoDb.query.get(0)
+                        if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
+                            return GetResp((200, {"err_code":4, "err_msg":"Game is ended"}))
+
+                    width, height = GetGameSize()
+                    cellx = data['cellx']
+                    celly = data['celly']
+                    if width == None:
+                        return GetResp((400, {"msg":"no valid game"}))
+                    if (cellx < 0 or cellx >= width or 
+                            celly < 0 or celly >= height):
+                        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
+
                 if "protocol" in kw_req_args:
                     if "protocol" not in data:
                         return GetResp((400, {"msg":"Need protocol!"}))
@@ -100,12 +111,16 @@ class CellDb(db.Model):
     last_update   = db.Column(db.Float, default = 0)
     timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
     cell_type     = db.Column(db.String(15), default = "normal")
+    is_base       = db.Column(db.Boolean, default = False)
     
     def Init(self, owner, currTime):
+        self.owner = owner
         self.attack_time = currTime
         self.is_taking = True
         self.finish_time = currTime
         self.attacker = owner
+        if GAME_VERSION == 'mainline':
+            self.is_base = True
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
@@ -123,10 +138,12 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type}
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.is_base}
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
+            if self.is_base and self.owner != self.attacker:
+                self.is_base = False
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
@@ -152,14 +169,35 @@ class CellDb(db.Model):
         if user.cd_time > currTime:
             db.session.commit()
             return False, 3, "You are in CD time!"
+        takeTime = (self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5) / (1 + user.energy/200.0)
+        if user.energy >= energyShop['attack'] and self.owner != 0 and self.attacker != self.owner:
+            user.energy = user.energy - energyShop['attack']
         self.attacker = uid
         self.attack_time = currTime
-        self.finish_time = currTime + self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5
+        self.finish_time = currTime + takeTime
         self.is_taking = True
         self.last_update = currTime
         user.cd_time = self.finish_time
         db.session.commit()
         return True, None, None
+
+    def BuildBase(self, uid, currTime):
+        if self.is_taking == True:
+            return False, 2, "This cell is being taken."
+        if self.is_base == True:
+            return False, 6, "This cell is already a base."
+        user = UserDb.query.with_for_update().get(uid)
+        if user.cd_time > currTime:
+            db.session.commit()
+            return False, 3, "You are in CD time!"
+        if user.energy < energyShop['base']:
+            db.session.commit()
+            return False, 5, "Not enough energy!"
+        user.energy = user.energy - energyShop['base']
+        self.is_base = True
+        db.session.commit()
+        return True, None, None
+
 
 class InfoDb(db.Model):
     __tablename__ = 'info'
@@ -168,6 +206,7 @@ class InfoDb(db.Model):
     height        = db.Column(db.Integer, default = 0)
     max_id        = db.Column(db.Integer, default = 0)         
     end_time      = db.Column(db.Float, default = 0)
+    join_end_time = db.Column(db.Float, default = 0)
     ai_only       = db.Column(db.Boolean, default = False)
     last_update   = db.Column(db.Float, default = 0)
 
@@ -196,6 +235,25 @@ def ClearCell(uid):
     db.session.commit()
     CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0})
     db.session.commit()
+
+def MoveBase(baseMoveList):
+    for baseData in baseMoveList:
+        uid = baseData[0]
+        x = baseData[1]
+        y = baseData[2]
+        directions = [(0,1), (1,0), (0,-1), (-1,0)]
+        random.shuffle(directions)
+        for d in directions:
+            cell = CellDb.query.filter_by(x = x+d[0], y = y+d[1], owner = uid, is_base = False).with_for_update().first()
+            print uid, d, x, y, cell
+            if cell == None:
+                db.session.commit()
+            else:
+                cell.is_base = True
+                db.session.commit()
+                break
+
+
 
 # Utility
 def GetGameSize():
@@ -230,7 +288,7 @@ def GetDateTimeFromSecs(secs):
 # Server side code 
 #======================================================================
 @app.route('/startgame', methods=['POST'])
-@require('admin_password', 'last_time')
+@require('admin_password', 'last_time', 'ai_join_time')
 def StartGame():
     data = request.get_json()
     if data['admin_password'] != ADMIN_PASSWORD:
@@ -249,30 +307,36 @@ def StartGame():
         endTime = currTime + data['last_time']
     else:
         endTime = 0
+    if data['ai_join_time'] != 0:
+        joinEndTime = currTime + data['ai_join_time']
+    else:
+        joinEndTime = 0
+
     # dirty hack here, set end_time = 1 during initialization so Attack() and 
     # Join() will not work while initialization
     i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, ai_only = aiOnly, last_update = currTime)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, join_end_time = joinEndTime, ai_only = aiOnly, last_update = currTime)
         db.session.add(i)
     else:
         i.width = width
         i.height = height
         i.max_id = width*height
         i.end_time = endTime
+        i.join_end_time = joinEndTime
         i.ai_only = aiOnly
         i.last_update = currTime
 
     totalCells = width * height
 
     if softRestart:
-        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal'})
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'is_base': False})
     else:
         for y in range(height):
             for x in range(width):
                 c = CellDb.query.with_for_update().get(x + y * width)
                 if c == None:
-                    c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime)
+                    c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime, is_base = False)
                     db.session.add(c)
                 else:
                     c.owner = 0
@@ -284,6 +348,7 @@ def StartGame():
                     c.attack_time = 0
                     c.last_update = currTime
                     c.cell_type = 'normal'
+                    c.is_base = False
 
     users = UserDb.query.with_for_update().all()
     for user in users:
@@ -329,18 +394,26 @@ def GetGameInfo():
     db.session.commit()
 
     retInfo = {}
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'game_version':GAME_VERSION}
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
     cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
 
     dirtyUserIds = set()
+    baseMoveList = []
     for cell in cells:
+        owner = cell.owner
+        isBase = cell.is_base
         dirtyUserIds.add(cell.attacker)
         dirtyUserIds.add(cell.owner)
-        cell.Refresh(currTime)
+        if cell.Refresh(currTime):
+            if isBase and owner != cell.owner:
+                baseMoveList.append((owner, cell.x, cell.y))
+
     db.session.commit()
+
+    MoveBase(baseMoveList)
 
     users = UserDb.query.with_for_update().all()
     userInfo = []
@@ -351,7 +424,8 @@ def GetGameInfo():
             cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
             user.cells = cellNum
             user.dirty = False
-        if user.cells == 0:
+        baseNum = CellDb.query.filter_by(owner = user.id, is_base = True).count()
+        if user.cells == 0 or (GAME_VERSION == 'mainline' and baseNum == 0):
             deadUserIds.append(user.id)
             user.Dead()
         else:
@@ -400,6 +474,10 @@ def JoinGame():
     info = InfoDb.query.get(0)
     if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
         return GetResp((200, {'err_code':4, "err_msg":"Game is ended"}))
+
+    if info.join_end_time != 0 and GetCurrDbTimeSecs() > info.join_end_time:
+        return GetResp((200, {'err_code':4, "err_msg":"Join time is ended"}))
+
     data = request.get_json()
 
     if ROOM_PASSWORD != None:
@@ -430,25 +508,15 @@ def JoinGame():
         return GetResp((200, {'err_code':10, 'err_msg':'No cell available to start'}))
     
 @app.route('/attack', methods=['POST'])
-@require('cellx', 'celly', 'token')
+@require('cellx', 'celly', 'token', action = True)
 def Attack():
     data = request.get_json()
-    u = UserDb.query.filter_by(token = data['token']).first()
-    if u == None:
-        return GetResp((400, {"msg":"user not valid"}))
-    info = InfoDb.query.get(0)
-    if info.end_time != 0 and GetCurrDbTimeSecs() > info.end_time:
-        return GetResp((200, {"err_code":4, "err_msg":"Game is ended"}))
 
+    u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
     celly = data['celly']
     uid = u.id
     width, height = GetGameSize()
-    if width == None:
-        return GetResp((400, {"msg":"no valid game"}))
-    if (cellx < 0 or cellx >= width or 
-            celly < 0 or celly >= height):
-        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
     c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
@@ -457,6 +525,26 @@ def Attack():
         return GetResp((200, {"err_code":0}))
     else:
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
+
+@app.route('/buildbase', methods=['POST'])
+@require('cellx', 'celly', 'token', action = True)
+def BuildBase():
+    if GAME_VERSION == 'release':
+        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
+    data = request.get_json()
+    u = UserDb.query.filter_by(token = data['token']).first()
+    cellx = data['cellx']
+    celly = data['celly']
+    uid = u.id
+    c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
+    if c == None:
+        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
+    success, err_code, msg = c.BuildBase(uid, GetCurrDbTimeSecs())
+    if success:
+        return GetResp((200, {"err_code":0}))
+    else:
+        return GetResp((200, {"err_code":err_code, "err_msg":msg}))
+
 
 @app.route('/checktoken', methods=['POST'])
 @require('token')

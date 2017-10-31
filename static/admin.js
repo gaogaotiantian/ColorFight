@@ -13,6 +13,7 @@ CreateGame = function(soft) {
         data: JSON.stringify({
             "admin_password":$('#admin_password').val(),
             "last_time":parseInt($('#last_time').val()),
+            "ai_join_time":parseInt($('#join_time').val()),
             "ai_only":aiOnly,
             "soft":soft
         }),

@@ -5,10 +5,12 @@ var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
 var attackImg = new Image();
+attackImg.src = '/static/attack.png';
+var baseImg = new Image();
+baseImg.src = '/static/base.png';
 var lastCurrTime = 0;
 var lastClientTime = 0;
 
-attackImg.src = '/static/attack.png';
 GetGameInfo = function() {
     if (!fullInfo) {
         $.ajax( {
@@ -81,15 +83,23 @@ UpdateTakeTime = function(cell, currTime) {
     }
 }
 WriteTimeLeft = function(info) {
-    if (info['end_time'] == 0) {
-        $("#time_left").text('');
-    } else {
-        if (info['end_time'] < info['time']) {
-            $('#time_left').text('Game ended!');
+    var s = '';
+    if (info['join_end_time'] != 0) {
+        if (info['join_end_time'] < info['time']) {
+            s += 'No player is allowed to join now!';
         } else {
-            $('#time_left').text('Time left: '+parseInt(info['end_time'] - info['time']).toString());
+            s += 'Join time left: ' + parseInt(info['join_end_time'] - info['time']).toString();
         }
     }
+    s += ' '
+    if (info['end_time'] != 0) {
+        if (info['end_time'] < info['time']) {
+            s += 'Game ended!';
+        } else {
+            s += 'Time left: ' + parseInt(info['end_time'] - info['time']).toString();
+        }
+    }
+    $('#time_left').text(s);
 }
 ListUsers = function(users, currTime) {
     $('#user_list').empty();
@@ -185,6 +195,16 @@ DrawGame = function() {
                 width: gameStatus.cellSize-strokeWidth,
                 height: gameStatus.cellSize-strokeWidth,
                 cornerRadius: 8
+            });
+        }
+        if ('b' in cell && cell['b'] == true) {
+            canvas.drawImage( {
+                source: baseImg,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
+                fromCenter: false,
+                width: gameStatus.cellSize-2,
+                height: gameStatus.cellSize-2
             });
         }
         if (cell['c'] != 0) {
