@@ -185,13 +185,27 @@ class UserDb(db.Model):
     dirty         = db.Column(db.Boolean)
     energy        = db.Column(db.Integer)
 
+    # Pre: lock user
+    # Post: lock user
     def Dead(self):
-        attackCells = CellDb.query.filter_by(attacker = self.id).with_for_update().all()
-        for cell in attackCells:
-            cell.is_taking = False
-            cell.attacker = 0
         db.session.delete(self)
         return True
+
+    # Pre: no lock
+    # Post: no lock
+    def ClearCell(self):
+        attackCells = CellDb.query.filter_by(attacker = self.id).with_for_update().all()
+        if attackCells != None:
+            for cell in attackCells:
+                cell.is_taking = False
+                cell.attacker = 0
+            db.session.commit()
+        ownCells = CellDb.query.filter_by(owner = self.id).with_for_update().all()
+        if ownCells != None:
+            for cell in ownCells:
+                cell.owner = 0
+            db.session.commit()
+
 
 
 db.create_all()
@@ -340,6 +354,7 @@ def GetGameInfo():
 
     users = UserDb.query.with_for_update().all()
     userInfo = []
+    deadUserIds = []
     for user in users:
         if user.dirty:
             cellNum = CellDb.query.filter_by(owner = user.id).count()
@@ -347,7 +362,7 @@ def GetGameInfo():
             user.cells = cellNum
             user.dirty = False
         if user.cells == 0:
-            user.Dead()
+            deadUserIds.append(user.id)
         else:
             if timeDiff > 0:
                 energyCellNum = CellDb.query.filter_by(owner = user.id, cell_type = 'energy').count()
@@ -361,6 +376,13 @@ def GetGameInfo():
     db.session.commit()
 
     retInfo['users'] = userInfo
+
+    for uid in deadUserIds:
+        u = UserDb.query.get(uid)
+        u.ClearCell()
+        u = UserDb.query.with_for_update().get(uid)
+        u.Dead()
+        db.session.commit()
 
     retCells = []
 
