@@ -378,7 +378,6 @@ def GetGameInfo():
     retInfo['users'] = userInfo
 
     for uid in deadUserIds:
-        print uid
         u = UserDb.query.get(uid)
         u.ClearCell()
         u = UserDb.query.with_for_update().get(uid)
