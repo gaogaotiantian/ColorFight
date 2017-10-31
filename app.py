@@ -127,16 +127,12 @@ class CellDb(db.Model):
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
-            # Do no lock the user here, it would dead lock
-            if self.owner != 0:
-                o = UserDb.query.get(self.owner)
-                o.dirty = True
-            a = UserDb.query.get(self.attacker)
-            a.dirty = True
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
             self.last_update = currTime
+            return True
+        return False
 
     def Attack(self, uid, currTime):
         if self.is_taking == True:
@@ -191,24 +187,15 @@ class UserDb(db.Model):
         db.session.delete(self)
         return True
 
-    # Pre: no lock
-    # Post: no lock
-    def ClearCell(self):
-        attackCells = CellDb.query.filter_by(attacker = self.id).with_for_update().all()
-        if attackCells != None:
-            for cell in attackCells:
-                cell.is_taking = False
-                cell.attacker = 0
-            db.session.commit()
-        ownCells = CellDb.query.filter_by(owner = self.id).with_for_update().all()
-        if ownCells != None:
-            for cell in ownCells:
-                cell.owner = 0
-            db.session.commit()
-
 
 
 db.create_all()
+
+def ClearCell(uid):
+    CellDb.query.filter_by(attacker = uid).with_for_update().update({'is_taking':False, 'attacker':0})
+    db.session.commit()
+    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0})
+    db.session.commit()
 
 # Utility
 def GetGameSize():
@@ -348,7 +335,10 @@ def GetGameInfo():
     # lock stuff
     cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
 
+    dirtyUserIds = set()
     for cell in cells:
+        dirtyUserIds.add(cell.attacker)
+        dirtyUserIds.add(cell.owner)
         cell.Refresh(currTime)
     db.session.commit()
 
@@ -356,13 +346,14 @@ def GetGameInfo():
     userInfo = []
     deadUserIds = []
     for user in users:
-        if user.dirty:
+        if user.id in dirtyUserIds:
             cellNum = CellDb.query.filter_by(owner = user.id).count()
             cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
             user.cells = cellNum
             user.dirty = False
         if user.cells == 0:
             deadUserIds.append(user.id)
+            user.Dead()
         else:
             if timeDiff > 0:
                 energyCellNum = CellDb.query.filter_by(owner = user.id, cell_type = 'energy').count()
@@ -378,11 +369,7 @@ def GetGameInfo():
     retInfo['users'] = userInfo
 
     for uid in deadUserIds:
-        u = UserDb.query.get(uid)
-        u.ClearCell()
-        u = UserDb.query.with_for_update().get(uid)
-        u.Dead()
-        db.session.commit()
+        ClearCell(uid)
 
     retCells = []
 
