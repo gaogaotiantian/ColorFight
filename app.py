@@ -6,6 +6,8 @@ import base64
 import cProfile, pstats, StringIO
 import random
 
+from line_profiler import LineProfiler
+
 import flask
 from flask import Flask, request, render_template
 from flask_sqlalchemy import SQLAlchemy
@@ -39,7 +41,7 @@ app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
 if os.environ.get('PROFILE') == 'True':
-    pr = cProfile.Profile()
+    pr = LineProfiler()
 else:
     pr = None
 pr_lastPrint = 0
@@ -219,10 +221,12 @@ class UserDb(db.Model):
     id            = db.Column(db.Integer, primary_key = True)
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
-    cd_time       = db.Column(db.Integer)
-    cells         = db.Column(db.Integer)
-    dirty         = db.Column(db.Boolean)
-    energy        = db.Column(db.Integer)
+    cd_time       = db.Column(db.Integer, default = 0)
+    cells         = db.Column(db.Integer, default = 0)
+    bases         = db.Column(db.Integer, default = 0)
+    energy_cells  = db.Column(db.Integer, default = 0)
+    dirty         = db.Column(db.Boolean, default = False)
+    energy        = db.Column(db.Integer, default = 0)
 
     # Pre: lock user
     # Post: lock user
@@ -393,7 +397,7 @@ def GetGameInfo():
         return GetResp((400, {"msg": "No game established"}))
     if int(currTime) - int(info.last_update) > 0:
         timeDiff = int(currTime) - int(info.last_update)
-    info.last_update = max(currTime, info.last_update)    
+        info.last_update = max(currTime, info.last_update)    
     db.session.commit()
 
     retInfo = {}
@@ -426,21 +430,21 @@ def GetGameInfo():
             cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
             cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
             user.cells = cellNum
-            user.dirty = False
-        baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
-        if user.cells == 0 or (GAME_VERSION == 'mainline' and baseNum == 0):
+            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
+            user.bases = baseNum
+            user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
+        if user.cells == 0 or (GAME_VERSION == 'mainline' and user.bases == 0):
             deadUserIds.append(user.id)
             user.Dead()
         else:
             if timeDiff > 0:
-                energyCellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
-                if energyCellNum > 0:
-                    user.energy = user.energy + timeDiff * energyCellNum
+                if user.energy_cells > 0:
+                    user.energy = user.energy + timeDiff * user.energy_cells
                     user.energy = min(100, user.energy)
                 else:
                     user.energy = user.energy - 1
                     user.energy = max(user.energy, 0)
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "energy":user.energy})
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "energy":user.energy})
     db.session.commit()
 
     retInfo['users'] = userInfo
@@ -460,14 +464,11 @@ def GetGameInfo():
 
     if pr:
         pr.disable()
-        s = StringIO.StringIO()
-        ps = pstats.Stats(pr, stream = s).sort_stats('cumulative')
         global pr_interval
         global pr_lastPrint
         if pr_lastPrint + pr_interval < currTime:
-            ps.print_stats(30)
+            pr.print_stats()
             pr_lastPrint = currTime
-            print s.getvalue()
 
     return resp
 
@@ -495,7 +496,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False, energy = 0)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, dirty = False, energy = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
@@ -572,3 +573,5 @@ def Index():
 @app.route('/admin.html')
 def Admin():
     return render_template('admin.html')
+
+pr.add_function(GetGameInfo)
