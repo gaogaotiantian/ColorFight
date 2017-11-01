@@ -249,7 +249,6 @@ def MoveBase(baseMoveList):
         random.shuffle(directions)
         for d in directions:
             cell = CellDb.query.filter_by(x = x+d[0], y = y+d[1], owner = uid, is_base = False).with_for_update().first()
-            print uid, d, x, y, cell
             if cell == None:
                 db.session.commit()
             else:
@@ -424,17 +423,17 @@ def GetGameInfo():
     deadUserIds = []
     for user in users:
         if user.id in dirtyUserIds:
-            cellNum = CellDb.query.filter_by(owner = user.id).count()
-            cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
+            cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
+            cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
             user.cells = cellNum
             user.dirty = False
-        baseNum = CellDb.query.filter_by(owner = user.id, is_base = True).count()
+        baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
         if user.cells == 0 or (GAME_VERSION == 'mainline' and baseNum == 0):
             deadUserIds.append(user.id)
             user.Dead()
         else:
             if timeDiff > 0:
-                energyCellNum = CellDb.query.filter_by(owner = user.id, cell_type = 'energy').count()
+                energyCellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
                 if energyCellNum > 0:
                     user.energy = user.energy + timeDiff * energyCellNum
                     user.energy = min(100, user.energy)
