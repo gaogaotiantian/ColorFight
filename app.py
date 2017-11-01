@@ -574,4 +574,5 @@ def Index():
 def Admin():
     return render_template('admin.html')
 
-pr.add_function(GetGameInfo)
+if pr:
+    pr.add_function(GetGameInfo)
