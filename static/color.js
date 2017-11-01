@@ -220,6 +220,15 @@ DrawGame = function() {
     }
 }
 
+CreateTitle = function() {
+    var s = "COLORFIGHT!";
+    for (var i = 0; i < s.length; i++) {
+        var c = s.charAt(i);
+        var $letter = $('<span>').text(c).css({"color":HashIdToColor(i+1)})
+        $('#title').append($letter);
+    }
+}
+
 HexCombine = function(src, dest, per) {
     var isrc = parseInt(src, 16);
     var idest = parseInt(dest, 16);
@@ -291,6 +300,7 @@ $(function() {
     var canvas = $('#my_canvas');
     canvas[0].width = canvas.parent().width()
     canvas[0].height = canvas[0].width
+    CreateTitle();
     GetGameInfo();
 
     $('#join').click(function() {
