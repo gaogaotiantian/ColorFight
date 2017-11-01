@@ -165,8 +165,6 @@ class CellDb(db.Model):
         if self.owner != uid and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
-
-
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             db.session.commit()
@@ -176,8 +174,8 @@ class CellDb(db.Model):
         else:
             takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if user.energy >= energyShop['attack'] and self.owner != 0 and self.attacker != self.owner:
-            user.energy = user.energy - energyShop['attack']
+        if user.energy > 0 and self.owner != 0 and self.attacker != self.owner:
+            user.energy = int(user.energy * 0.95)
         self.attacker = uid
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
