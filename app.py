@@ -284,7 +284,6 @@ def GetCurrDbTimeSecs(dbtime = None):
     return (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
 
 def GetDateTimeFromSecs(secs):
-    dbtime = GetCurrDbTime()
     return datetime.datetime.utcfromtimestamp(secs)
 
 
@@ -389,16 +388,17 @@ def GetGameInfo():
 
     timeDiff = 0
 
+    retInfo = {}
+
     info = InfoDb.query.with_for_update().get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
     if int(currTime) - int(info.last_update) > 0:
         timeDiff = int(currTime) - int(info.last_update)
     info.last_update = max(currTime, info.last_update)    
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
     db.session.commit()
 
-    retInfo = {}
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
