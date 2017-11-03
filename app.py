@@ -404,7 +404,7 @@ def GetGameInfo():
 
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
-    cells = CellDb.query.filter(CellDb.id < info.max_id).filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
+    cells = CellDb.query.filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
 
     dirtyUserIds = set()
     baseMoveList = []
