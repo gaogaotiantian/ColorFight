@@ -1,3 +1,11 @@
+#title {
+    font-family:"Helvetica";
+    font-weight: bold;
+    font-size:220%;
+    text-shadow:
+         0px  0px 2px #999900; 
+         0px  0px 2px #999900; 
+}
 .user_name {
     font-family:"Comic Sans MS";
     font-weight: bold;

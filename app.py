@@ -6,6 +6,8 @@ import base64
 import cProfile, pstats, StringIO
 import random
 
+from line_profiler import LineProfiler
+
 import flask
 from flask import Flask, request, render_template
 from flask_sqlalchemy import SQLAlchemy
@@ -39,7 +41,7 @@ app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
 if os.environ.get('PROFILE') == 'True':
-    pr = cProfile.Profile()
+    pr = LineProfiler()
 else:
     pr = None
 pr_lastPrint = 0
@@ -163,8 +165,6 @@ class CellDb(db.Model):
         if self.owner != uid and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
-
-
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             db.session.commit()
@@ -174,8 +174,8 @@ class CellDb(db.Model):
         else:
             takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if user.energy >= energyShop['attack'] and self.owner != 0 and self.attacker != self.owner:
-            user.energy = user.energy - energyShop['attack']
+        if user.energy > 0 and self.owner != 0 and self.attacker != self.owner:
+            user.energy = int(user.energy * 0.95)
         self.attacker = uid
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
@@ -219,10 +219,12 @@ class UserDb(db.Model):
     id            = db.Column(db.Integer, primary_key = True)
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
-    cd_time       = db.Column(db.Integer)
-    cells         = db.Column(db.Integer)
-    dirty         = db.Column(db.Boolean)
-    energy        = db.Column(db.Integer)
+    cd_time       = db.Column(db.Integer, default = 0)
+    cells         = db.Column(db.Integer, default = 0)
+    bases         = db.Column(db.Integer, default = 0)
+    energy_cells  = db.Column(db.Integer, default = 0)
+    dirty         = db.Column(db.Boolean, default = False)
+    energy        = db.Column(db.Integer, default = 0)
 
     # Pre: lock user
     # Post: lock user
@@ -249,7 +251,6 @@ def MoveBase(baseMoveList):
         random.shuffle(directions)
         for d in directions:
             cell = CellDb.query.filter_by(x = x+d[0], y = y+d[1], owner = uid, is_base = False).with_for_update().first()
-            print uid, d, x, y, cell
             if cell == None:
                 db.session.commit()
             else:
@@ -395,7 +396,8 @@ def GetGameInfo():
         return GetResp((400, {"msg": "No game established"}))
     if int(currTime) - int(info.last_update) > 0:
         timeDiff = int(currTime) - int(info.last_update)
-    info.last_update = max(currTime, info.last_update)    
+        info.last_update = max(currTime, info.last_update)    
+
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
     db.session.commit()
 
@@ -424,24 +426,24 @@ def GetGameInfo():
     deadUserIds = []
     for user in users:
         if user.id in dirtyUserIds:
-            cellNum = CellDb.query.filter_by(owner = user.id).count()
-            cellNum += 4*CellDb.query.filter_by(owner = user.id, cell_type = 'gold').count()
+            cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
+            cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
             user.cells = cellNum
-            user.dirty = False
-        baseNum = CellDb.query.filter_by(owner = user.id, is_base = True).count()
-        if user.cells == 0 or (GAME_VERSION == 'mainline' and baseNum == 0):
+            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
+            user.bases = baseNum
+            user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
+        if user.cells == 0 or (GAME_VERSION == 'mainline' and user.bases == 0):
             deadUserIds.append(user.id)
             user.Dead()
         else:
             if timeDiff > 0:
-                energyCellNum = CellDb.query.filter_by(owner = user.id, cell_type = 'energy').count()
-                if energyCellNum > 0:
-                    user.energy = user.energy + timeDiff * energyCellNum
+                if user.energy_cells > 0:
+                    user.energy = user.energy + timeDiff * user.energy_cells
                     user.energy = min(100, user.energy)
                 else:
                     user.energy = user.energy - 1
                     user.energy = max(user.energy, 0)
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "energy":user.energy})
+            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "energy":user.energy})
     db.session.commit()
 
     retInfo['users'] = userInfo
@@ -461,14 +463,11 @@ def GetGameInfo():
 
     if pr:
         pr.disable()
-        s = StringIO.StringIO()
-        ps = pstats.Stats(pr, stream = s).sort_stats('cumulative')
         global pr_interval
         global pr_lastPrint
         if pr_lastPrint + pr_interval < currTime:
-            ps.print_stats(30)
+            pr.print_stats()
             pr_lastPrint = currTime
-            print s.getvalue()
 
     return resp
 
@@ -496,7 +495,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, dirty = False, energy = 0)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, dirty = False, energy = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
@@ -573,3 +572,6 @@ def Index():
 @app.route('/admin.html')
 def Admin():
     return render_template('admin.html')
+
+if pr:
+    pr.add_function(GetGameInfo)
