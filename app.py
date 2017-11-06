@@ -239,7 +239,7 @@ db.create_all()
 def ClearCell(uid):
     CellDb.query.filter_by(attacker = uid).with_for_update().update({'is_taking':False, 'attacker':0})
     db.session.commit()
-    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0})
+    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0, 'is_base':False})
     db.session.commit()
 
 def MoveBase(baseMoveList):
