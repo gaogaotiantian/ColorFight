@@ -174,7 +174,7 @@ class CellDb(db.Model):
         else:
             takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if user.energy > 0 and self.owner != 0 and self.attacker != self.owner:
+        if user.energy > 0 and self.owner != 0 and uid != self.owner:
             user.energy = int(user.energy * 0.95)
         self.attacker = uid
         self.attack_time = currTime
