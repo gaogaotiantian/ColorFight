@@ -170,9 +170,9 @@ class CellDb(db.Model):
             db.session.commit()
             return False, 3, "You are in CD time!"
         if GAME_VERSION == 'release':
-            takeTime = (self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5) / (1 + user.energy/200.0)
+            takeTime = (self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5) / (1 + user.energy/100.0)
         else:
-            takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
+            takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
 
         if user.energy > 0 and self.owner != 0 and uid != self.owner:
             user.energy = int(user.energy * 0.95)
