@@ -114,6 +114,7 @@ class CellDb(db.Model):
     timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
     cell_type     = db.Column(db.String(15), default = "normal")
     is_base       = db.Column(db.Boolean, default = False)
+    build_time    = db.Column(db.Float, default = 0)
     
     def Init(self, owner, currTime):
         self.owner = owner
@@ -121,8 +122,8 @@ class CellDb(db.Model):
         self.is_taking = True
         self.finish_time = currTime
         self.attacker = owner
-        if GAME_VERSION == 'mainline':
-            self.is_base = True
+        self.build_time = 0
+        self.is_base = True
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
@@ -140,16 +141,25 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.is_base}
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.is_base, 'bt':self.build_time}
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
             if self.is_base and self.owner != self.attacker:
                 self.is_base = False
+            if self.build_time != 0:
+                self.build_time = 0
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
             self.last_update = currTime
+            return True
+        return False
+
+    def RefreshBuild(self, currTime):
+        if self.build_time != 0 and self.build_time + 30 <= currTime:
+            self.is_base = True
+            self.build_time = 0
             return True
         return False
 
@@ -169,10 +179,7 @@ class CellDb(db.Model):
         if user.cd_time > currTime:
             db.session.commit()
             return False, 3, "You are in CD time!"
-        if GAME_VERSION == 'release':
-            takeTime = (self.GetTakeTime(currTime) - max(0, (adjCells - 1))*0.5) / (1 + user.energy/100.0)
-        else:
-            takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
+        takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
 
         if user.energy > 0 and self.owner != 0 and uid != self.owner:
             user.energy = int(user.energy * 0.95)
@@ -190,6 +197,16 @@ class CellDb(db.Model):
             return False, 2, "This cell is being taken."
         if self.is_base == True:
             return False, 6, "This cell is already a base."
+        
+        currBuildBase = CellDb.query.filter(CellDb.owner == uid).filter(CellDb.build_time != 0).first() is not None
+        if currBuildBase:
+            db.session.commit()
+            return False, 7, "You are already building a base."
+        baseNum = CellDb.query.filter_by(owner = uid, is_base = True).count()
+        if baseNum >= 3:
+            db.session.commit()
+            return False, 8, "You have reached the base number limit"
+        
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             db.session.commit()
@@ -198,7 +215,7 @@ class CellDb(db.Model):
             db.session.commit()
             return False, 5, "Not enough energy!"
         user.energy = user.energy - energyShop['base']
-        self.is_base = True
+        self.build_time = currTime
         db.session.commit()
         return True, None, None
 
@@ -364,10 +381,9 @@ def StartGame():
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    if GAME_VERSION == 'mainline':
-        energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
-        for cell in energyCells:
-            cell.cell_type = 'energy'
+    energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+    for cell in energyCells:
+        cell.cell_type = 'energy'
 
     db.session.commit()
 
@@ -419,6 +435,11 @@ def GetGameInfo():
 
     db.session.commit()
 
+    cells = CellDb.query.filter(CellDb.build_time != 0).with_for_update().all()
+    for cell in cells:
+        if cell.RefreshBuild(currTime):
+            dirtyUserIds.add(cell.owner)
+
     MoveBase(baseMoveList)
 
     users = UserDb.query.with_for_update().all()
@@ -432,7 +453,7 @@ def GetGameInfo():
             baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
             user.bases = baseNum
             user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
-        if user.cells == 0 or (GAME_VERSION == 'mainline' and user.bases == 0):
+        if user.cells == 0 or user.bases == 0:
             deadUserIds.append(user.id)
             user.Dead()
         else:

@@ -124,7 +124,6 @@ ListUsers = function(users, currTime) {
 
         if (gameStatus.info.game_version == 'mainline') {
             var barWidth = user['energy'].toString() + '%';
-            console.log(barWidth)
             $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":barWidth, "height":"3px"}));
             var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow).append($energyRow);
         } else {
@@ -205,6 +204,17 @@ DrawGame = function() {
                 fromCenter: false,
                 width: gameStatus.cellSize-2,
                 height: gameStatus.cellSize-2
+            });
+        }
+        if ('bt' in cell && cell['bt'] != 0) {
+            canvas.drawImage( {
+                source: baseImg,
+                x: cell.x*gameStatus.cellSize,
+                y: cell.y*gameStatus.cellSize,
+                fromCenter: false,
+                width: gameStatus.cellSize-2,
+                height: gameStatus.cellSize-2,
+                opacity: Math.abs(currTime - Math.floor(currTime) - 0.5)*2
             });
         }
         if (cell['c'] != 0) {
