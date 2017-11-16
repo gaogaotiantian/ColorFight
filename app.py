@@ -238,6 +238,9 @@ class CellDb(db.Model):
             return False, 1, "Invalid direction"
 
         user = UserDb.query.with_for_update().get(uid)
+        if user.cd_time > currTime:
+            db.session.commit()
+            return False, 3, "You are in CD time!"
         if user.energy < energyShop['boom']:
             return False, 5, "Not enough energy!"
         user.energy = user.energy - energyShop['boom']
@@ -248,6 +251,7 @@ class CellDb(db.Model):
                 cell.attack_time = currTime
                 cell.finish_time = currTime + 1
                 cell.is_taking = True
+        user.cd_time = currTime + 1
 
         db.session.commit()
         return True, None, None
