@@ -49,6 +49,7 @@ protocolVersion = 1
 
 energyShop = {
     "base": 60,
+    "boom": 30,
     "attack": 2
 }
 
@@ -200,24 +201,57 @@ class CellDb(db.Model):
         
         currBuildBase = CellDb.query.filter(CellDb.owner == uid).filter(CellDb.build_time != 0).first() is not None
         if currBuildBase:
-            db.session.commit()
             return False, 7, "You are already building a base."
         baseNum = CellDb.query.filter_by(owner = uid, is_base = True).count()
         if baseNum >= 3:
-            db.session.commit()
             return False, 8, "You have reached the base number limit"
         
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
-            db.session.commit()
             return False, 3, "You are in CD time!"
         if user.energy < energyShop['base']:
-            db.session.commit()
             return False, 5, "Not enough energy!"
         user.energy = user.energy - energyShop['base']
         self.build_time = currTime
         db.session.commit()
         return True, None, None
+
+    def Boom(self, uid, direction, currTime):
+        if self.owner != uid:
+            return False, 1, "Cell position invalid!"
+        if direction == "square":
+            db.session.commit()
+            cells = CellDb.query.filter(CellDb.x >= self.x - 1).filter(CellDb.x <= self.x + 1)\
+                                .filter(CellDb.y >= self.y - 1).filter(CellDb.y <= self.y + 1)\
+                                .with_for_update().all()
+        elif direction == "vertical":
+            db.session.commit()
+            cells = CellDb.query.filter(CellDb.y >= self.y - 4).filter(CellDb.y <= self.y + 4)\
+                                .filter(CellDb.x == self.x)\
+                                .with_for_update().all()
+        elif direction == "horizontal":
+            db.session.commit()
+            cells = CellDb.query.filter(CellDb.x >= self.x - 4).filter(CellDb.x <= self.x + 4)\
+                                .filter(CellDb.y == self.y)\
+                                .with_for_update().all()
+        else:
+            return False, 1, "Invalid direction"
+
+        user = UserDb.query.with_for_update().get(uid)
+        if user.energy < energyShop['boom']:
+            return False, 5, "Not enough energy!"
+        user.energy = user.energy - energyShop['boom']
+
+        for cell in cells:
+            if cell.x != self.x or cell.y != self.y:
+                cell.attacker = 0
+                cell.attack_time = currTime
+                cell.finish_time = currTime + 1
+                cell.is_taking = True
+
+        db.session.commit()
+        return True, None, None
+
 
 
 class InfoDb(db.Model):
@@ -548,13 +582,12 @@ def Attack():
     if success:
         return GetResp((200, {"err_code":0}))
     else:
+        db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/buildbase', methods=['POST'])
 @require('cellx', 'celly', 'token', action = True)
 def BuildBase():
-    if GAME_VERSION == 'release':
-        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
@@ -567,8 +600,29 @@ def BuildBase():
     if success:
         return GetResp((200, {"err_code":0}))
     else:
+        db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
+@app.route('/boom', methods=['POST'])
+@require('cellx', 'celly', 'token', 'direction', action = True)
+def Boom():
+    data = request.get_json()
+    if GAME_VERSION == "release":
+        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
+    u = UserDb.query.filter_by(token = data['token']).first()
+    cellx = data['cellx']
+    celly = data['celly']
+    direction = data['direction']
+    uid = u.id
+    c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
+    if c == None:
+        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
+    success, err_code, msg = c.Boom(uid, direction, GetCurrDbTimeSecs())
+    if success:
+        return GetResp((200, {"err_code":0}))
+    else:
+        db.session.commit()
+        return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/checktoken', methods=['POST'])
 @require('token')
