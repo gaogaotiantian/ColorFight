@@ -122,14 +122,10 @@ ListUsers = function(users, currTime) {
         }
         $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
 
-        if (gameStatus.info.game_version == 'mainline') {
-            var barWidth = user['energy'].toString() + '%';
-            $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":barWidth, "height":"3px"}));
-            var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow).append($energyRow);
-        } else {
-            var $userDiv = $("<div>").addClass("col-12").append($userRow);
-            
-        }
+        var barWidth = user['energy'].toString() + '%';
+        $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":barWidth, "height":"3px"}));
+        var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow).append($energyRow);
+
         $('#user_list').append($userDiv);
     }
 }
