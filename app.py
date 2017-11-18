@@ -50,6 +50,7 @@ protocolVersion = 1
 energyShop = {
     "base": 60,
     "boom": 30,
+    "boost": 10,
     "attack": 2
 }
 
@@ -164,7 +165,7 @@ class CellDb(db.Model):
             return True
         return False
 
-    def Attack(self, uid, currTime):
+    def Attack(self, uid, currTime, boost = False):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
@@ -178,9 +179,17 @@ class CellDb(db.Model):
 
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
-            db.session.commit()
             return False, 3, "You are in CD time!"
+
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
+
+        if GAME_VERSION == "mainline":
+            if boost == True:
+                if user.energy < energyShop['boost']:
+                    return False, 5, "You don't have enough energy"
+                else:
+                    user.energy -= energyShop['boost']
+                    takeTime = 2
 
         if user.energy > 0 and self.owner != 0 and uid != self.owner:
             user.energy = int(user.energy * 0.95)
@@ -578,11 +587,15 @@ def Attack():
     cellx = data['cellx']
     celly = data['celly']
     uid = u.id
+    if GAME_VERSION == 'mainline' and 'boost' in data and data['boost'] == True:
+        boost = True
+    else:
+        boost = False
     width, height = GetGameSize()
     c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs())
+    success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs(), boost)
     if success:
         return GetResp((200, {"err_code":0}))
     else:
