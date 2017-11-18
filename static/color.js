@@ -8,6 +8,8 @@ var attackImg = new Image();
 attackImg.src = '/static/attack.png';
 var baseImg = new Image();
 baseImg.src = '/static/base.png';
+var shieldImg = new Image();
+shieldImg.src = '/static/shield.png';
 var lastCurrTime = 0;
 var lastClientTime = 0;
 
@@ -214,14 +216,25 @@ DrawGame = function() {
             });
         }
         if (cell['c'] != 0) {
-            canvas.drawImage( {
-                source: attackImg,
-                x: cell.x*gameStatus.cellSize+3,
-                y: cell.y*gameStatus.cellSize+3,
-                fromCenter: false,
-                width: gameStatus.cellSize-6,
-                height: gameStatus.cellSize-6
-            });
+            if (cell['o'] != cell['a']) {
+                canvas.drawImage( {
+                    source: attackImg,
+                    x: cell.x*gameStatus.cellSize+3,
+                    y: cell.y*gameStatus.cellSize+3,
+                    fromCenter: false,
+                    width: gameStatus.cellSize-6,
+                    height: gameStatus.cellSize-6
+                });
+            } else {
+                canvas.drawImage( {
+                    source: shieldImg,
+                    x: cell.x*gameStatus.cellSize+3,
+                    y: cell.y*gameStatus.cellSize+3,
+                    fromCenter: false,
+                    width: gameStatus.cellSize-7,
+                    height: gameStatus.cellSize-7
+                });
+            }
         }
     }
 }
