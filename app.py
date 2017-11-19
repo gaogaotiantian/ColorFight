@@ -322,7 +322,7 @@ db.create_all()
 def ClearCell(uid):
     CellDb.query.filter_by(attacker = uid).with_for_update().update({'is_taking':False, 'attacker':0})
     db.session.commit()
-    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0, 'is_base':False})
+    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0, 'is_base':False, 'build_time':0})
     db.session.commit()
 
 def MoveBase(baseMoveList):
@@ -514,7 +514,10 @@ def GetGameInfo():
     for user in users:
         if user.id in dirtyUserIds:
             cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
-            cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
+            if GAME_VERSION == "release":
+                cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
+            elif GAME_VERSION == "mainline":
+                cellNum += 9*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
             user.cells = cellNum
             baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
             user.bases = baseNum
