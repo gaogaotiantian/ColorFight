@@ -49,7 +49,8 @@ protocolVersion = 1
 
 energyShop = {
     "base": 60,
-    "boom": 30,
+    "boomAtk": 30,
+    "boomDef": 50,
     "boost": 10,
     "attack": 2
 }
@@ -225,8 +226,15 @@ class CellDb(db.Model):
         db.session.commit()
         return True, None, None
 
-    def Boom(self, uid, direction, currTime):
-        if self.owner != uid:
+    def Boom(self, uid, direction, boomType, currTime):
+        if boomType == 'attack':
+            energyCost = energyShop['boomAtk']
+        elif boomType == 'defense':
+            energyCost = energyShop['boomDef']
+        else:
+            return False, 1, "Invalid boomType"
+
+        if boomType == 'attack' and self.owner != uid:
             return False, 1, "Cell position invalid!"
         if direction == "square":
             db.session.commit()
@@ -250,17 +258,28 @@ class CellDb(db.Model):
         if user.cd_time > currTime:
             db.session.commit()
             return False, 3, "You are in CD time!"
-        if user.energy < energyShop['boom']:
+        if user.energy < energyCost:
             return False, 5, "Not enough energy!"
-        user.energy = user.energy - energyShop['boom']
+        user.energy = user.energy - energyCost
 
         for cell in cells:
-            if cell.x != self.x or cell.y != self.y:
-                cell.attacker = 0
-                cell.attack_time = currTime
-                cell.finish_time = currTime + 1
-                cell.is_taking = True
-        user.cd_time = currTime + 1
+            if boomType == 'attack':
+                if cell.x != self.x or cell.y != self.y:
+                    cell.attacker = 0
+                    cell.attack_time = currTime
+                    cell.finish_time = currTime + 1
+                    cell.is_taking = True
+            elif boomType == 'defense':
+                if cell.owner == uid:
+                    cell.attacker = uid
+                    cell.attack_time = currTime
+                    cell.finish_time = currTime + 2
+                    cell.is_taking = True
+
+        if boomType == 'attack':
+            user.cd_time = currTime + 1
+        elif boomType == 'defense':
+            user.cd_time = currTime + 2
 
         db.session.commit()
         return True, None, None
@@ -621,7 +640,7 @@ def BuildBase():
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/boom', methods=['POST'])
-@require('cellx', 'celly', 'token', 'direction', action = True)
+@require('cellx', 'celly', 'token', 'direction', 'boomType', action = True)
 def Boom():
     data = request.get_json()
     if GAME_VERSION == "release":
@@ -630,11 +649,12 @@ def Boom():
     cellx = data['cellx']
     celly = data['celly']
     direction = data['direction']
+    boomType = data['boomType']
     uid = u.id
     c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Boom(uid, direction, GetCurrDbTimeSecs())
+    success, err_code, msg = c.Boom(uid, direction, boomType, GetCurrDbTimeSecs())
     if success:
         return GetResp((200, {"err_code":0}))
     else:
