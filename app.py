@@ -417,7 +417,7 @@ def StartGame():
     totalCells = width * height
 
     if softRestart:
-        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'is_base': False})
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'is_base': False, 'build_time':0})
     else:
         for y in range(height):
             for x in range(width):
