@@ -387,8 +387,8 @@ def StartGame():
         aiOnly = True
     else:
         aiOnly = False
-    width =  15
-    height = 15
+    width =  30
+    height = 30
     currTime = GetCurrDbTimeSecs()
     if data['last_time'] != 0:
         endTime = currTime + data['last_time']
