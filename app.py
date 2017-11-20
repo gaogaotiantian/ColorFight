@@ -501,10 +501,12 @@ def GetGameInfo():
 
     db.session.commit()
 
-    cells = CellDb.query.filter(CellDb.build_time != 0).with_for_update().all()
+    cells = CellDb.query.filter(CellDb.build_time != 0).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
     for cell in cells:
         if cell.RefreshBuild(currTime):
             dirtyUserIds.add(cell.owner)
+
+    db.session.commit()
 
     MoveBase(baseMoveList)
 
