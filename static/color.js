@@ -1,6 +1,6 @@
 //hostUrl = "http://localhost:8000/"
 hostUrl = "https://colorfight.herokuapp.com/"
-var gameStatus = {"cellSize":20, 'cells':[], 'info':[], 'selectId': -1}
+var gameStatus = {"cellSize":20, 'cells':[], 'info':[], 'selectId': -1, 'globalDirty': false}
 var once = {'once':0};
 var lastUpdate = 0;
 var fullInfo = false;
@@ -28,6 +28,7 @@ GetGameInfo = function() {
                 WriteTimeLeft(gameInfo['info']);
                 gameStatus.cells = gameInfo['cells'];
                 gameStatus.info = gameInfo['info'];
+                gameStatus['globalDirty'] = true;
                 lastUpdate = currTime;
                 lastCurrTime = currTime;
                 var d = new Date();
@@ -52,6 +53,7 @@ GetGameInfo = function() {
                 for (var idx in gameInfo['cells']) {
                     cell = gameInfo['cells'][idx];
                     gameStatus['cells'][cell.x+cell.y*gameInfo['info']['width']] = cell;
+                    gameStatus['cells'][cell.x+cell.y*gameInfo['info']['width']]['dirty'] = true;
                 }
                 for (var idx in gameStatus['cells']) {
                     UpdateTakeTime(gameStatus['cells'][idx], currTime)
@@ -80,7 +82,11 @@ UpdateTakeTime = function(cell, currTime) {
         if (cell['o'] == 0) {
             cell['t'] = 2;
         } else {
-            cell['t'] = GetTakeTimeEq(currTime - cell['ot'])
+            var newTime = GetTakeTimeEq(currTime - cell['ot'])
+            if (Math.abs(cell['t'] - newTime) > 0.5) {
+                cell['t'] = newTime;
+                cell['dirty'] = true;
+            }
         }
     }
 }
@@ -144,11 +150,21 @@ DrawGame = function() {
     if (w + canvas.offset().top > window.innerHeight) {
         w = window.innerHeight - canvas.offset().top;
     }
-    canvas[0].width = w;
-    canvas[0].height = w;
+
+    // If we need a global refresh, we clear the canvas
+    if (w != canvas[0].width || gameStatus['globalDirty'] == true) {
+        canvas[0].width = w;
+        canvas[0].height = w;
+        gameStatus['globalDirty'] = true;
+    }
+
     gameStatus.cellSize = Math.floor(w/info['width']);
     var width = info['width'];
     var height = info['height'];
+
+    if (gameStatus['globalDirty']) {
+        var gDirty = true;
+    }
 
     for (idx in cells) {
         var cell = cells[idx];
@@ -156,54 +172,84 @@ DrawGame = function() {
         var attacker = cell['a'];
         var strokeColor = 'white';
         var strokeWidth = 3;
-        if (gameStatus['selectId'] == owner) {
-            var fillColor = HashIdToColor(owner);
-            strokeWidth = 2;
-        } else {
-            if (cell['c'] == 0) {
-                var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/8));
+
+        if (gDirty || cell['dirty'] || cell['c'] != 0) {
+            if (gameStatus['selectId'] == owner) {
+                var fillColor = HashIdToColor(owner);
+                strokeWidth = 2;
             } else {
-                var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
+                if (cell['c'] == 0) {
+                    var fillColor = CombineColor(HashIdToColor(0), HashIdToColor(owner), Math.min(1, cell['t']/8));
+                } else {
+                    var fillColor = CombineColor(HashIdToColor(owner), HashIdToColor(attacker), Math.min(1, (currTime - cell['at']) / (cell['f'] - cell['at'])));
+                }
+            }
+
+            if ('ct' in cell && cell['ct'] == 'gold' ) {
+                strokeColor = '#999900'
+            }
+            if ('ct' in cell && cell['ct'] == 'energy') {
+                canvas.drawPolygon( {
+                    fillStyle: fillColor,
+                    strokeStyle: '#4444AA',
+                    strokeWidth: strokeWidth,
+                    x: cell.x*gameStatus.cellSize,
+                    y: cell.y*gameStatus.cellSize,
+                    fromCenter: false,
+                    radius: (gameStatus.cellSize-strokeWidth)/2,
+                    sides: 6
+                })
+            } else {
+                canvas.drawRect( {
+                    fillStyle: fillColor,
+                    strokeStyle: strokeColor,
+                    strokeWidth: strokeWidth,
+                    x: cell.x*gameStatus.cellSize,
+                    y: cell.y*gameStatus.cellSize,
+                    fromCenter: false,
+                    width: gameStatus.cellSize-strokeWidth,
+                    height: gameStatus.cellSize-strokeWidth,
+                    cornerRadius: 8
+                });
+            }
+
+            if ('b' in cell && cell['b'] == true) {
+                canvas.drawImage( {
+                    source: baseImg,
+                    x: cell.x*gameStatus.cellSize,
+                    y: cell.y*gameStatus.cellSize,
+                    fromCenter: false,
+                    width: gameStatus.cellSize-2,
+                    height: gameStatus.cellSize-2
+                });
+            }
+            if (cell['c'] != 0) {
+                if (cell['o'] != cell['a']) {
+                    canvas.drawImage( {
+                        source: attackImg,
+                        x: cell.x*gameStatus.cellSize+3,
+                        y: cell.y*gameStatus.cellSize+3,
+                        fromCenter: false,
+                        width: gameStatus.cellSize-6,
+                        height: gameStatus.cellSize-6
+                    });
+                } else {
+                    canvas.drawImage( {
+                        source: shieldImg,
+                        x: cell.x*gameStatus.cellSize+3,
+                        y: cell.y*gameStatus.cellSize+3,
+                        fromCenter: false,
+                        width: gameStatus.cellSize-7,
+                        height: gameStatus.cellSize-7
+                    });
+                }
             }
         }
+        if (cell['dirty']) {
+            cell['dirty'] = false;
+        }
 
-        if ('ct' in cell && cell['ct'] == 'gold' ) {
-            strokeColor = '#999900'
-        }
-        if ('ct' in cell && cell['ct'] == 'energy') {
-            canvas.drawPolygon( {
-                fillStyle: fillColor,
-                strokeStyle: '#4444AA',
-                strokeWidth: strokeWidth,
-                x: cell.x*gameStatus.cellSize,
-                y: cell.y*gameStatus.cellSize,
-                fromCenter: false,
-                radius: (gameStatus.cellSize-strokeWidth)/2,
-                sides: 6
-            })
-        } else {
-            canvas.drawRect( {
-                fillStyle: fillColor,
-                strokeStyle: strokeColor,
-                strokeWidth: strokeWidth,
-                x: cell.x*gameStatus.cellSize,
-                y: cell.y*gameStatus.cellSize,
-                fromCenter: false,
-                width: gameStatus.cellSize-strokeWidth,
-                height: gameStatus.cellSize-strokeWidth,
-                cornerRadius: 8
-            });
-        }
-        if ('b' in cell && cell['b'] == true) {
-            canvas.drawImage( {
-                source: baseImg,
-                x: cell.x*gameStatus.cellSize,
-                y: cell.y*gameStatus.cellSize,
-                fromCenter: false,
-                width: gameStatus.cellSize-2,
-                height: gameStatus.cellSize-2
-            });
-        }
+        // This part is animation, we draw it regardless for now 
         if ('bt' in cell && cell['bt'] != 0) {
             canvas.drawImage( {
                 source: baseImg,
@@ -215,27 +261,10 @@ DrawGame = function() {
                 opacity: Math.abs(currTime - Math.floor(currTime) - 0.5)*2
             });
         }
-        if (cell['c'] != 0) {
-            if (cell['o'] != cell['a']) {
-                canvas.drawImage( {
-                    source: attackImg,
-                    x: cell.x*gameStatus.cellSize+3,
-                    y: cell.y*gameStatus.cellSize+3,
-                    fromCenter: false,
-                    width: gameStatus.cellSize-6,
-                    height: gameStatus.cellSize-6
-                });
-            } else {
-                canvas.drawImage( {
-                    source: shieldImg,
-                    x: cell.x*gameStatus.cellSize+3,
-                    y: cell.y*gameStatus.cellSize+3,
-                    fromCenter: false,
-                    width: gameStatus.cellSize-7,
-                    height: gameStatus.cellSize-7
-                });
-            }
-        }
+    }
+
+    if (gDirty) {
+        gameStatus['globalDirty'] = false;
     }
 }
 
@@ -335,13 +364,19 @@ $(function() {
 
     $('body').on("mouseenter", '.user-row', function() {
         gameStatus['selectId'] = $(this).attr("uid");
+        gameStatus['globalDirty'] = true;
     })
     $('body').on("mouseleave", '.user-row', function() {
         gameStatus['selectId'] = -1;
+        gameStatus['globalDirty'] = true;
     })
     $('body').on("mouseleave", '#user_list', function() {
         gameStatus['selectId'] = -1;
+        gameStatus['globalDirty'] = true;
     })
     setInterval(DrawGame, 50);
+    setInterval(function() {
+        gameStatus['globalDirty'] = true;
+    }, 1000);
 })
 
