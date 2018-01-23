@@ -33,7 +33,7 @@ else:
 if os.environ.get('GAME_VERSION') != None:
     GAME_VERSION = os.environ.get('GAME_VERSION')
 else:
-    GAME_VERSION = 'mainline'
+    GAME_VERSION = 'full'
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -46,6 +46,7 @@ else:
     pr = None
 pr_lastPrint = 0
 protocolVersion = 1
+gameRefreshInterval = 0.06
 
 energyShop = {
     "base": 60,
@@ -184,7 +185,7 @@ class CellDb(db.Model):
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
 
-        if GAME_VERSION == "mainline":
+        if GAME_VERSION == "full":
             if boost == True:
                 if user.energy < energyShop['boost']:
                     return False, 5, "You don't have enough energy"
@@ -307,7 +308,7 @@ class UserDb(db.Model):
     bases         = db.Column(db.Integer, default = 0)
     energy_cells  = db.Column(db.Integer, default = 0)
     dirty         = db.Column(db.Boolean, default = False)
-    energy        = db.Column(db.Integer, default = 0)
+    energy        = db.Column(db.Float, default = 0)
 
     # Pre: lock user
     # Post: lock user
@@ -369,6 +370,60 @@ def GetCurrDbTimeSecs(dbtime = None):
 
 def GetDateTimeFromSecs(secs):
     return datetime.datetime.utcfromtimestamp(secs)
+
+def UpdateGame(currTime, timeDiff):
+    # Refresh the cells that needs to be refreshed first because this will
+    # lock stuff
+    cells = CellDb.query.filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
+
+    dirtyUserIds = set()
+    baseMoveList = []
+    for cell in cells:
+        owner = cell.owner
+        isBase = cell.is_base
+        dirtyUserIds.add(cell.attacker)
+        dirtyUserIds.add(cell.owner)
+        if cell.Refresh(currTime):
+            if isBase and owner != cell.owner:
+                baseMoveList.append((owner, cell.x, cell.y))
+
+    db.session.commit()
+
+    cells = CellDb.query.filter(CellDb.build_time != 0).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
+    for cell in cells:
+        if cell.RefreshBuild(currTime):
+            dirtyUserIds.add(cell.owner)
+
+    db.session.commit()
+
+    MoveBase(baseMoveList)
+
+    users = UserDb.query.with_for_update().all()
+    userInfo = []
+    deadUserIds = []
+    for user in users:
+        if user.id in dirtyUserIds:
+            cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
+            cellNum += 9*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
+            user.cells = cellNum
+            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
+            user.bases = baseNum
+            user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
+        if user.cells == 0 or (GAME_VERSION == 'full' and user.bases == 0):
+            deadUserIds.append(user.id)
+            user.Dead()
+        else:
+            if timeDiff > 0:
+                if user.energy_cells > 0:
+                    user.energy = user.energy + timeDiff * user.energy_cells
+                    user.energy = min(100, user.energy)
+                else:
+                    user.energy = max(user.energy, 0)
+    db.session.commit()
+
+    for uid in deadUserIds:
+        ClearCell(uid)
+
 
 
 #======================================================================
@@ -447,9 +502,10 @@ def StartGame():
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
-    for cell in energyCells:
-        cell.cell_type = 'energy'
+    if GAME_VERSION == 'full':
+        energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+        for cell in energyCells:
+            cell.cell_type = 'energy'
 
     db.session.commit()
 
@@ -458,6 +514,7 @@ def StartGame():
 @app.route('/getgameinfo', methods=['POST'])
 def GetGameInfo():
     global pr
+    global gameRefreshInterval
     if (pr):
         pr.enable()
     currTime = GetCurrDbTimeSecs()
@@ -476,72 +533,26 @@ def GetGameInfo():
     info = InfoDb.query.with_for_update().get(0)
     if info == None:
         return GetResp((400, {"msg": "No game established"}))
-    if int(currTime) - int(info.last_update) > 0:
-        timeDiff = int(currTime) - int(info.last_update)
-        info.last_update = max(currTime, info.last_update)    
+    if currTime - info.last_update > gameRefreshInterval:
+        timeDiff = currTime - info.last_update
+        info.last_update = currTime    
+        refreshGame = True
+    else:
+        refreshGame = False
 
     retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
-    db.session.commit()
-
-
-    # Refresh the cells that needs to be refreshed first because this will
-    # lock stuff
-    cells = CellDb.query.filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
-
-    dirtyUserIds = set()
-    baseMoveList = []
-    for cell in cells:
-        owner = cell.owner
-        isBase = cell.is_base
-        dirtyUserIds.add(cell.attacker)
-        dirtyUserIds.add(cell.owner)
-        if cell.Refresh(currTime):
-            if isBase and owner != cell.owner:
-                baseMoveList.append((owner, cell.x, cell.y))
 
     db.session.commit()
 
-    cells = CellDb.query.filter(CellDb.build_time != 0).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
-    for cell in cells:
-        if cell.RefreshBuild(currTime):
-            dirtyUserIds.add(cell.owner)
+    if refreshGame:
+        UpdateGame(currTime, timeDiff)
 
-    db.session.commit()
-
-    MoveBase(baseMoveList)
-
-    users = UserDb.query.with_for_update().all()
+    users = UserDb.query.all()
     userInfo = []
-    deadUserIds = []
     for user in users:
-        if user.id in dirtyUserIds:
-            cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
-            if GAME_VERSION == "release":
-                cellNum += 4*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
-            elif GAME_VERSION == "mainline":
-                cellNum += 9*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
-            user.cells = cellNum
-            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
-            user.bases = baseNum
-            user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
-        if user.cells == 0 or user.bases == 0:
-            deadUserIds.append(user.id)
-            user.Dead()
-        else:
-            if timeDiff > 0:
-                if user.energy_cells > 0:
-                    user.energy = user.energy + timeDiff * user.energy_cells
-                    user.energy = min(100, user.energy)
-                else:
-                    user.energy = user.energy - 1
-                    user.energy = max(user.energy, 0)
-            userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "energy":user.energy})
+        userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "energy":user.energy})
     db.session.commit()
-
     retInfo['users'] = userInfo
-
-    for uid in deadUserIds:
-        ClearCell(uid)
 
     retCells = []
 
@@ -611,7 +622,7 @@ def Attack():
     cellx = data['cellx']
     celly = data['celly']
     uid = u.id
-    if GAME_VERSION == 'mainline' and 'boost' in data and data['boost'] == True:
+    if GAME_VERSION == 'full' and 'boost' in data and data['boost'] == True:
         boost = True
     else:
         boost = False
@@ -629,6 +640,8 @@ def Attack():
 @app.route('/buildbase', methods=['POST'])
 @require('cellx', 'celly', 'token', action = True)
 def BuildBase():
+    if GAME_VERSION != 'full':
+        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
@@ -648,7 +661,7 @@ def BuildBase():
 @require('cellx', 'celly', 'token', 'direction', 'boomType', action = True)
 def Boom():
     data = request.get_json()
-    if GAME_VERSION == "release":
+    if GAME_VERSION != "full":
         return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
