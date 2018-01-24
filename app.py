@@ -35,6 +35,11 @@ if os.environ.get('GAME_VERSION') != None:
 else:
     GAME_VERSION = 'full'
 
+if os.environ.get('GAME_REFRESH_INTERVAL') != None:
+    gameRefreshInterval = os.environ.get('GAME_REFRESH_INTERVAL')
+else:
+    gameRefreshInterval = 0.1
+
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
@@ -46,7 +51,6 @@ else:
     pr = None
 pr_lastPrint = 0
 protocolVersion = 1
-gameRefreshInterval = 0.06
 
 energyShop = {
     "base": 60,
