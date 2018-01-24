@@ -71,9 +71,9 @@ GetGameInfo = function() {
 }
 GetTakeTimeEq = function(timeDiff) {
    if (timeDiff <= 0) {
-       return 200
+       return 33
    }
-   return 20*(Math.pow(2,(-timeDiff/20)))+2
+   return 30*(Math.pow(2,(-timeDiff/30)))+3
 }
 UpdateTakeTime = function(cell, currTime) {
     if (cell['c'] == 1) {
