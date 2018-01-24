@@ -127,7 +127,7 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        self.is_base = True
+        self.is_base = False
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
