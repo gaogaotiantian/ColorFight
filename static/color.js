@@ -230,8 +230,8 @@ DrawGame = function() {
                         x: cell.x*gameStatus.cellSize+3,
                         y: cell.y*gameStatus.cellSize+3,
                         fromCenter: false,
-                        width: gameStatus.cellSize-6,
-                        height: gameStatus.cellSize-6
+                        width: gameStatus.cellSize-7,
+                        height: gameStatus.cellSize-7
                     });
                 } else {
                     canvas.drawImage( {
