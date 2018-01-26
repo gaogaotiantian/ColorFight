@@ -180,11 +180,13 @@ class CellDb(db.Model):
             adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
             if adjc != None and adjc.owner == uid:
                 adjCells += 1
+        db.session.commit()
         if self.owner != uid and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
+            db.session.commit()
             return False, 3, "You are in CD time!"
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
@@ -192,6 +194,7 @@ class CellDb(db.Model):
         if GAME_VERSION == "full":
             if boost == True:
                 if user.energy < energyShop['boost']:
+                    db.session.commit()
                     return False, 5, "You don't have enough energy"
                 else:
                     user.energy -= energyShop['boost']
