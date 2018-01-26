@@ -36,7 +36,7 @@ else:
     GAME_VERSION = 'full'
 
 if os.environ.get('GAME_REFRESH_INTERVAL') != None:
-    gameRefreshInterval = os.environ.get('GAME_REFRESH_INTERVAL')
+    gameRefreshInterval = float(os.environ.get('GAME_REFRESH_INTERVAL'))
 else:
     gameRefreshInterval = 0.1
 
