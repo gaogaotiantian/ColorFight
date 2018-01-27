@@ -131,7 +131,10 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        self.is_base = False
+        if GAME_VERSION == "full":
+            self.is_base = True
+        else:
+            self.is_base = False
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
@@ -171,44 +174,39 @@ class CellDb(db.Model):
             return True
         return False
 
-    def Attack(self, uid, currTime, boost = False):
+    # user is a locked instance of UserDb
+    # user CD is ready, checked already
+    # Do not commit inside this function, it will be done outside of the function
+    def Attack(self, user, currTime, boost = False):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
         adjCells = 0
         for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
-            if adjc != None and adjc.owner == uid:
+            if adjc != None and adjc.owner == user.id:
                 adjCells += 1
-        db.session.commit()
-        if self.owner != uid and adjCells == 0:
+        if self.owner != user.id and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
-
-        user = UserDb.query.with_for_update().get(uid)
-        if user.cd_time > currTime:
-            db.session.commit()
-            return False, 3, "You are in CD time!"
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
 
         if GAME_VERSION == "full":
             if boost == True:
                 if user.energy < energyShop['boost']:
-                    db.session.commit()
                     return False, 5, "You don't have enough energy"
                 else:
                     user.energy -= energyShop['boost']
                     takeTime = 2
 
-        if user.energy > 0 and self.owner != 0 and uid != self.owner:
+        if user.energy > 0 and self.owner != 0 and user.id != self.owner:
             user.energy = int(user.energy * 0.95)
-        self.attacker = uid
+        self.attacker = user.id
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
         self.is_taking = True
         self.last_update = currTime
         user.cd_time = self.finish_time
-        db.session.commit()
         return True, None, None
 
     def BuildBase(self, uid, currTime):
@@ -352,12 +350,20 @@ def MoveBase(baseMoveList):
 
 
 # Utility
+globalGameWidth = None
+globalGameHeight = None
 def GetGameSize():
-    i = InfoDb.query.get(0)
-    if i == None:
-        return None, None
-    else:
-        return i.width, i.height
+    global globalGameWidth
+    global globalGameHeight
+
+    if globalGameWidth == None:
+        i = InfoDb.query.get(0)
+        if i == None:
+            return None, None
+        else:
+            globalGameWidth = i.width
+            globalGameHeight = i.height
+    return globalGameWidth, globalGameHeight
 
 
 def GetResp(t):
@@ -451,6 +457,12 @@ def StartGame():
         aiOnly = False
     width =  30
     height = 30
+    global globalGameWidth
+    global globalGameHeight
+
+    globalGameWidth = width
+    globalGameHeight = height
+
     currTime = GetCurrDbTimeSecs()
     if data['last_time'] != 0:
         endTime = currTime + data['last_time']
@@ -625,10 +637,17 @@ def JoinGame():
 def Attack():
     data = request.get_json()
 
-    u = UserDb.query.filter_by(token = data['token']).first()
+    u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
+    if u == None:
+        db.session.commit()
+        return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
     cellx = data['cellx']
     celly = data['celly']
-    uid = u.id
+    currTime = GetCurrDbTimeSecs()
+    if u.cd_time > currTime:
+        db.session.commit()
+        return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
+
     if GAME_VERSION == 'full' and 'boost' in data and data['boost'] == True:
         boost = True
     else:
@@ -636,12 +655,15 @@ def Attack():
     width, height = GetGameSize()
     c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
+        db.session.commit()
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Attack(uid, GetCurrDbTimeSecs(), boost)
+    success, err_code, msg = c.Attack(u, GetCurrDbTimeSecs(), boost)
+    # This commit is important because cell.Attack() will not commit
+    # At this point, c and user should both be locked
+    db.session.commit()
     if success:
         return GetResp((200, {"err_code":0}))
     else:
-        db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/buildbase', methods=['POST'])
