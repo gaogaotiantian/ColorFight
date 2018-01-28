@@ -122,6 +122,7 @@ ListUsers = function(users, currTime) {
     for (idx in users) {
         user = users[idx];
         var $userRow = $("<div>").addClass("row user-row").attr("uid", user['id']);
+        var $goldRow = $("<div>").addClass("progress");
         var $energyRow = $("<div>").addClass("progress");
         if (user['cd_time'] > currTime) {
             $userRow.append($("<div>").addClass("col-9 user-col").css({"padding":"0px"}).append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
@@ -130,9 +131,17 @@ ListUsers = function(users, currTime) {
         }
         $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
 
-        var barWidth = user['energy'].toString() + '%';
-        $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":barWidth, "height":"3px"}));
-        var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow).append($energyRow);
+        var goldBarWidth = user['gold'].toString() + '%';
+        var energyBarWidth = user['energy'].toString() + '%';
+        $goldRow.append($("<div>").addClass("progress-bar bg-warning").attr("role", "progressbar").css({"width":goldBarWidth, "height":"4px"}));
+        $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":energyBarWidth, "height":"4px"}));
+        var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow);
+        if (gameStatus['info']['game_version'] == 'mainline') {
+            $userDiv.append($goldRow);
+        } else if (gameStatus['info']['game_version'] == 'full') {
+            $userDiv.append($goldRow);
+            $userDiv.append($energyRow);
+        }
 
         $('#user_list').append($userDiv);
     }
@@ -173,7 +182,8 @@ DrawGame = function() {
         var strokeColor = 'white';
         var strokeWidth = 3;
 
-        if (gDirty || cell['dirty'] || cell['c'] != 0) {
+        if (gDirty || cell['dirty'] || cell['c'] != 0 ||
+                ('bt' in cell && cell['bt'] > 0)) {
             if (gameStatus['selectId'] == owner) {
                 var fillColor = HashIdToColor(owner);
                 strokeWidth = 2;
