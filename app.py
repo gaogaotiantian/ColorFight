@@ -50,7 +50,7 @@ if os.environ.get('PROFILE') == 'True':
 else:
     pr = None
 pr_lastPrint = 0
-protocolVersion = 1
+protocolVersion = 2
 
 energyShop = {
     "boomAtk": 30,
@@ -105,7 +105,7 @@ def require(*required_args, **kw_req_args):
                     if "protocol" not in data:
                         return GetResp((400, {"msg":"Need protocol!"}))
                     if data['protocol'] < kw_req_args['protocol']:
-                        return GetResp((400, {"msg":"Protocol version too low"}))
+                        return GetResp((400, {"msg":"Protocol version too low. If you are using ColorFightAI, please update(git pull) in your directory!"}))
             return func(*args, **kw)
         return wrapper
     return decorator
@@ -124,7 +124,8 @@ class CellDb(db.Model):
     last_update   = db.Column(db.Float, default = 0)
     timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
     cell_type     = db.Column(db.String(15), default = "normal")
-    is_base       = db.Column(db.Boolean, default = False)
+    build_type    = db.Column(db.String(15), default = "empty")
+    build_finish  = db.Column(db.Boolean, default = True)
     build_time    = db.Column(db.Float, default = 0)
     
     def Init(self, owner, currTime):
@@ -135,9 +136,11 @@ class CellDb(db.Model):
         self.attacker = owner
         self.build_time = 0
         if GAME_VERSION == "full" or GAME_VERSION == "mainline":
-            self.is_base = True
+            self.build_type = "base"
+            self.build_finish = True
         else:
-            self.is_base = False
+            self.build_type = "empty"
+            self.build_finish = True
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
@@ -155,13 +158,14 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.is_base, 'bt':self.build_time}
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.build_type, 'bt':self.build_time, 'bf':self.build_finish}
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
-            if self.is_base and self.owner != self.attacker:
-                self.is_base = False
-            if self.build_time != 0:
+            if self.build_type == "base" and self.owner != self.attacker:
+                self.build_type = "empty"
+            if not self.build_finish:
+                self.build_finish = True
                 self.build_time = 0
             self.is_taking = False
             self.owner     = self.attacker
@@ -171,9 +175,8 @@ class CellDb(db.Model):
         return False
 
     def RefreshBuild(self, currTime):
-        if self.build_time != 0 and self.build_time + 30 <= currTime:
-            self.is_base = True
-            self.build_time = 0
+        if self.build_type == "base" and self.build_finish == False and self.build_time + 30 <= currTime:
+            self.build_finish = True
             return True
         return False
 
@@ -215,13 +218,13 @@ class CellDb(db.Model):
     def BuildBase(self, uid, currTime):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
-        if self.is_base == True:
+        if self.build_type == "base":
             return False, 6, "This cell is already a base."
         
-        currBuildBase = CellDb.query.filter(CellDb.owner == uid).filter(CellDb.build_time != 0).first() is not None
+        currBuildBase = CellDb.query.filter(CellDb.owner == uid).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
         if currBuildBase:
             return False, 7, "You are already building a base."
-        baseNum = CellDb.query.filter_by(owner = uid, is_base = True).count()
+        baseNum = CellDb.query.filter_by(owner = uid, build_type = "base").count()
         if baseNum >= 3:
             return False, 8, "You have reached the base number limit"
         
@@ -231,7 +234,9 @@ class CellDb(db.Model):
         if user.gold < goldShop['base']:
             return False, 5, "Not enough gold!"
         user.gold = user.gold - goldShop['base']
+        self.build_type = "base"
         self.build_time = currTime
+        self.build_finish = False
         db.session.commit()
         return True, None, None
 
@@ -332,7 +337,7 @@ db.create_all()
 def ClearCell(uid):
     CellDb.query.filter_by(attacker = uid).with_for_update().update({'is_taking':False, 'attacker':0})
     db.session.commit()
-    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0, 'is_base':False, 'build_time':0})
+    CellDb.query.filter_by(owner = uid).with_for_update().update({'owner':0, 'build_type':'empty', 'build_finish':True, 'build_time':0})
     db.session.commit()
 
 def MoveBase(baseMoveList):
@@ -343,11 +348,12 @@ def MoveBase(baseMoveList):
         directions = [(0,1), (1,0), (0,-1), (-1,0)]
         random.shuffle(directions)
         for d in directions:
-            cell = CellDb.query.filter_by(x = x+d[0], y = y+d[1], owner = uid, is_base = False).with_for_update().first()
+            cell = CellDb.query.filter_by(x = x+d[0], y = y+d[1], owner = uid, build_type = "empty").with_for_update().first()
             if cell == None:
                 db.session.commit()
             else:
-                cell.is_base = True
+                cell.build_type = "base"
+                cell.build_finish = True
                 db.session.commit()
                 break
 
@@ -397,7 +403,7 @@ def UpdateGame(currTime, timeDiff):
     baseMoveList = []
     for cell in cells:
         owner = cell.owner
-        isBase = cell.is_base
+        isBase = cell.build_type == "base" and cell.build_finish == True
         dirtyUserIds.add(cell.attacker)
         dirtyUserIds.add(cell.owner)
         if cell.Refresh(currTime):
@@ -406,7 +412,7 @@ def UpdateGame(currTime, timeDiff):
 
     db.session.commit()
 
-    cells = CellDb.query.filter(CellDb.build_time != 0).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
+    cells = CellDb.query.filter(CellDb.build_type == "base").filter(CellDb.build_finish == False).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
     for cell in cells:
         if cell.RefreshBuild(currTime):
             dirtyUserIds.add(cell.owner)
@@ -423,7 +429,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
             cellNum += 9*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
             user.cells = cellNum
-            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.is_base == True).scalar()
+            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").filter(CellDb.build_finish == True).scalar()
             user.bases = baseNum
             user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
             user.gold_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
@@ -439,7 +445,7 @@ def UpdateGame(currTime, timeDiff):
                 else:
                     user.energy = max(user.energy, 0)
 
-                if user.gold_cells > 0 and GAME_VERSION == 'mainline':
+                if user.gold_cells > 0 and (GAME_VERSION == 'mainline' or GAME_VERSION == 'full'):
                     user.gold = user.gold + timeDiff * user.gold_cells
                     user.gold = min(100, user.gold)
                 else:
@@ -504,13 +510,13 @@ def StartGame():
     totalCells = width * height
 
     if softRestart:
-        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'is_base': False, 'build_time':0})
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'build_type': "empty", 'build_finish':"true", 'build_time':0})
     else:
         for y in range(height):
             for x in range(width):
                 c = CellDb.query.with_for_update().get(x + y * width)
                 if c == None:
-                    c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime, is_base = False)
+                    c = CellDb(id = x + y * width, x = x, y = y, last_update = currTime, build_type = "empty", build_finish = True)
                     db.session.add(c)
                 else:
                     c.owner = 0
@@ -522,7 +528,8 @@ def StartGame():
                     c.attack_time = 0
                     c.last_update = currTime
                     c.cell_type = 'normal'
-                    c.is_base = False
+                    c.build_type = 'base'
+                    c.build_finish = True
 
     users = UserDb.query.with_for_update().all()
     for user in users:

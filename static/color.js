@@ -20,7 +20,7 @@ GetGameInfo = function() {
             method: "POST",
             dataType: "json",
             contentType: 'application/json;charset=UTF-8',
-            data: JSON.stringify({'protocol':1}),
+            data: JSON.stringify({'protocol':2}),
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
@@ -44,7 +44,7 @@ GetGameInfo = function() {
             method: "POST",
             dataType: "json",
             contentType: 'application/json;charset=UTF-8',
-            data: JSON.stringify({'protocol':1, 'timeAfter':lastUpdate}),
+            data: JSON.stringify({'protocol':2, 'timeAfter':lastUpdate}),
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
@@ -223,7 +223,7 @@ DrawGame = function() {
                 });
             }
 
-            if ('b' in cell && cell['b'] == true) {
+            if (cell['b'] == "base" && cell['bf'] == true) {
                 canvas.drawImage( {
                     source: baseImg,
                     x: cell.x*gameStatus.cellSize,
@@ -260,7 +260,7 @@ DrawGame = function() {
         }
 
         // This part is animation, we draw it regardless for now 
-        if ('bt' in cell && cell['bt'] != 0) {
+        if (cell['b'] == 'base' && cell['bf'] == false) {
             canvas.drawImage( {
                 source: baseImg,
                 x: cell.x*gameStatus.cellSize,
