@@ -53,8 +53,8 @@ pr_lastPrint = 0
 protocolVersion = 2
 
 energyShop = {
-    "boomAtk": 30,
-    "boomDef": 50,
+    "blastAtk": 30,
+    "blastDef": 40,
     "boost": 10,
     "attack": 2
 }
@@ -120,6 +120,7 @@ class CellDb(db.Model):
     is_taking     = db.Column(db.Boolean, default = False)
     attacker      = db.Column(db.Integer, default = 0)
     attack_time   = db.Column(db.Float, default = 0)
+    attack_type   = db.Column(db.String(15), default = "normal")
     finish_time   = db.Column(db.Float, default = 0)
     last_update   = db.Column(db.Float, default = 0)
     timestamp     = db.Column(db.TIMESTAMP, default = db.func.current_timestamp(), onupdate = db.func.current_timestamp())
@@ -135,12 +136,8 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        if GAME_VERSION == "full" or GAME_VERSION == "mainline":
-            self.build_type = "base"
-            self.build_finish = True
-        else:
-            self.build_type = "empty"
-            self.build_finish = True
+        self.build_type = "base"
+        self.build_finish = True
 
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
@@ -158,7 +155,7 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.build_type, 'bt':self.build_time, 'bf':self.build_finish}
+        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 'aty':self.attack_type, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.build_type, 'bt':self.build_time, 'bf':self.build_finish}
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
@@ -171,6 +168,7 @@ class CellDb(db.Model):
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
             self.last_update = currTime
+            self.attack_type = 'normal'
             return True
         return False
 
@@ -195,18 +193,18 @@ class CellDb(db.Model):
         if self.owner != user.id and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
-        takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/100.0)
+        takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if GAME_VERSION == "full":
+        if GAME_VERSION == 'mainline' or GAME_VERSION == "full":
             if boost == True:
                 if user.energy < energyShop['boost']:
                     return False, 5, "You don't have enough energy"
                 else:
                     user.energy -= energyShop['boost']
-                    takeTime = 2
+                    takeTime = 1
 
         if user.energy > 0 and self.owner != 0 and user.id != self.owner:
-            user.energy = int(user.energy * 0.95)
+            user.energy = user.energy * 0.95
         self.attacker = user.id
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
@@ -240,15 +238,15 @@ class CellDb(db.Model):
         db.session.commit()
         return True, None, None
 
-    def Boom(self, uid, direction, boomType, currTime):
-        if boomType == 'attack':
-            energyCost = energyShop['boomAtk']
-        elif boomType == 'defense':
-            energyCost = energyShop['boomDef']
+    def Blast(self, uid, direction, blastType, currTime):
+        if blastType == 'attack':
+            energyCost = energyShop['blastAtk']
+        elif blastType == 'defense':
+            energyCost = energyShop['blastDef']
         else:
-            return False, 1, "Invalid boomType"
+            return False, 1, "Invalid blastType"
 
-        if boomType == 'attack' and self.owner != uid:
+        if blastType == 'attack' and self.owner != uid:
             return False, 1, "Cell position invalid!"
         if direction == "square":
             db.session.commit()
@@ -270,29 +268,29 @@ class CellDb(db.Model):
 
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
-            db.session.commit()
             return False, 3, "You are in CD time!"
         if user.energy < energyCost:
             return False, 5, "Not enough energy!"
         user.energy = user.energy - energyCost
 
         for cell in cells:
-            if boomType == 'attack':
-                if cell.x != self.x or cell.y != self.y:
+            if blastType == 'attack':
+                if (cell.x != self.x or cell.y != self.y) and cell.owner != uid:
                     cell.attacker = 0
                     cell.attack_time = currTime
                     cell.finish_time = currTime + 1
+                    cell.attack_type = 'blast'
                     cell.is_taking = True
-            elif boomType == 'defense':
+            elif blastType == 'defense':
                 if cell.owner == uid:
                     cell.attacker = uid
                     cell.attack_time = currTime
                     cell.finish_time = currTime + 2
                     cell.is_taking = True
 
-        if boomType == 'attack':
+        if blastType == 'attack':
             user.cd_time = currTime + 1
-        elif boomType == 'defense':
+        elif blastType == 'defense':
             user.cd_time = currTime + 2
 
         db.session.commit()
@@ -434,7 +432,7 @@ def UpdateGame(currTime, timeDiff):
             user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
             user.gold_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
 
-        if user.cells == 0 or ((GAME_VERSION == 'full' or GAME_VERSION == 'mainline') and user.bases == 0):
+        if user.cells == 0 or user.bases == 0:
             deadUserIds.append(user.id)
             user.Dead()
         else:
@@ -445,7 +443,7 @@ def UpdateGame(currTime, timeDiff):
                 else:
                     user.energy = max(user.energy, 0)
 
-                if user.gold_cells > 0 and (GAME_VERSION == 'mainline' or GAME_VERSION == 'full'):
+                if user.gold_cells > 0:
                     user.gold = user.gold + timeDiff * user.gold_cells
                     user.gold = min(100, user.gold)
                 else:
@@ -541,7 +539,7 @@ def StartGame():
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    if GAME_VERSION == 'full':
+    if GAME_VERSION == 'full' or GAME_VERSION == 'mainline':
         energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
         for cell in energyCells:
             cell.cell_type = 'energy'
@@ -689,8 +687,6 @@ def Attack():
 @app.route('/buildbase', methods=['POST'])
 @require('cellx', 'celly', 'token', action = True)
 def BuildBase():
-    if GAME_VERSION != 'full' and GAME_VERSION != 'mainline':
-        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
@@ -706,9 +702,9 @@ def BuildBase():
         db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
-@app.route('/boom', methods=['POST'])
-@require('cellx', 'celly', 'token', 'direction', 'boomType', action = True)
-def Boom():
+@app.route('/blast', methods=['POST'])
+@require('cellx', 'celly', 'token', 'direction', 'blastType', action = True)
+def Blast():
     data = request.get_json()
     if GAME_VERSION != "full":
         return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
@@ -716,12 +712,12 @@ def Boom():
     cellx = data['cellx']
     celly = data['celly']
     direction = data['direction']
-    boomType = data['boomType']
+    blastType = data['blastType']
     uid = u.id
     c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Boom(uid, direction, boomType, GetCurrDbTimeSecs())
+    success, err_code, msg = c.Blast(uid, direction, blastType, GetCurrDbTimeSecs())
     if success:
         return GetResp((200, {"err_code":0}))
     else:

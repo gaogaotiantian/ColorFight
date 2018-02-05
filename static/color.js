@@ -10,6 +10,8 @@ var baseImg = new Image();
 baseImg.src = '/static/base.png';
 var shieldImg = new Image();
 shieldImg.src = '/static/shield.png';
+var blastImg = new Image();
+blastImg.src = '/static/blast.png';
 var lastCurrTime = 0;
 var lastClientTime = 0;
 
@@ -234,7 +236,17 @@ DrawGame = function() {
                 });
             }
             if (cell['c'] != 0) {
-                if (cell['o'] != cell['a']) {
+                if (cell['aty'] == "blast") {
+                    canvas.drawImage( {
+                        source: blastImg,
+                        x: cell.x*gameStatus.cellSize,
+                        y: cell.y*gameStatus.cellSize,
+                        fromCenter: false,
+                        width: gameStatus.cellSize-1,
+                        height: gameStatus.cellSize-1
+                    });
+
+                } else if (cell['o'] != cell['a']) {
                     canvas.drawImage( {
                         source: attackImg,
                         x: cell.x*gameStatus.cellSize+3,
