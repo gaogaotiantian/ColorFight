@@ -535,7 +535,7 @@ def StartGame():
                     c.attack_time = 0
                     c.last_update = currTime
                     c.cell_type = 'normal'
-                    c.build_type = 'base'
+                    c.build_type = 'empty'
                     c.build_finish = True
 
     users = UserDb.query.with_for_update().all()
