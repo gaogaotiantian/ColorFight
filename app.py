@@ -322,11 +322,20 @@ class UserDb(db.Model):
     dirty         = db.Column(db.Boolean, default = False)
     energy        = db.Column(db.Float, default = 0)
     gold          = db.Column(db.Float, default = 0)
+    dead_time     = db.Column(db.Integer, default = 0)
 
     # Pre: lock user
     # Post: lock user
-    def Dead(self):
-        db.session.delete(self)
+    def Dead(self, currTime):
+        info = InfoDb.query.get(0);
+        if info.end_time != 0:
+            self.dead_time = currTime
+            self.token     = ""
+            self.energy    = 0
+            self.gold      = 0
+            self.cells     = 0
+        else:
+            db.session.delete(self)
         return True
 
 
@@ -434,7 +443,7 @@ def UpdateGame(currTime, timeDiff):
 
         if user.cells == 0 or user.bases == 0:
             deadUserIds.append(user.id)
-            user.Dead()
+            user.Dead(currTime)
         else:
             if timeDiff > 0:
                 if user.energy_cells > 0:
@@ -587,7 +596,7 @@ def GetGameInfo():
     users = UserDb.query.all()
     userInfo = []
     for user in users:
-        userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "gold_cell_num":user.gold_cells, "energy":user.energy, "gold":user.gold})
+        userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "gold_cell_num":user.gold_cells, "energy":user.energy, "gold":user.gold, "dead_time":user.dead_time})
     db.session.commit()
     retInfo['users'] = userInfo
 
@@ -635,7 +644,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 0)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 0, dead_time = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()

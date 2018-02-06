@@ -118,6 +118,14 @@ ListUsers = function(users, currTime) {
             return -1;
         } else if (a['cell_num'] < b['cell_num']) {
             return 1;
+        } else if (a['dead_time'] > b['dead_time']) {
+            return -1;
+        } else if (a['dead_time'] < b['dead_time']) {
+            return 1;
+        } else if (a['id'] > b['id']) {
+            return -1;
+        } else if (a['id'] < b['id']) {
+            return 1;
         }
         return 0;
     });
@@ -126,12 +134,16 @@ ListUsers = function(users, currTime) {
         var $userRow = $("<div>").addClass("row user-row").attr("uid", user['id']);
         var $goldRow = $("<div>").addClass("progress");
         var $energyRow = $("<div>").addClass("progress");
-        if (user['cd_time'] > currTime) {
-            $userRow.append($("<div>").addClass("col-9 user-col").css({"padding":"0px"}).append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
-        } else {
-            $userRow.append($("<div>").addClass("col-9 user-col").css({"padding":"0px"}).append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", HashIdToColor(user['id']))))
+        var userColor  = HashIdToColor(user['id']);
+        if (user['dead_time'] != 0) {
+            userColor = '#777777';
         }
-        $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", HashIdToColor(user['id']))));
+        if (user['cd_time'] > currTime) {
+            $userRow.append($("<div>").addClass("col-9 user-col").css({"padding":"0px"}).append($("<i>").addClass("fa fa-ban text-danger")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", userColor)))
+        } else {
+            $userRow.append($("<div>").addClass("col-9 user-col").css({"padding":"0px"}).append($("<i>").addClass("fa fa-check text-success")).append($("<span>").text(" "+ user['name']).addClass("user_name").css("color", userColor)))
+        }
+        $userRow.append($("<div>").addClass("col-3").append($("<span>").text(user['cell_num'].toString()).addClass("user_name").css("color", userColor)));
 
         var goldBarWidth = user['gold'].toString() + '%';
         var energyBarWidth = user['energy'].toString() + '%';
