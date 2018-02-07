@@ -142,7 +142,7 @@ class CellDb(db.Model):
     def GetTakeTimeEq(self, timeDiff):
         if timeDiff <= 0:
             return 33
-        return 30*(2**(-timeDiff/30))+3
+        return 30*(2**(-timeDiff/30.0))+3
 
     def GetTakeTime(self, currTime):
         if self.is_taking == False:
