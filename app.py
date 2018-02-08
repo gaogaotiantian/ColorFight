@@ -500,7 +500,7 @@ def StartGame():
     else:
         joinEndTime = 0
 
-    gameId = int(random.getrandbits(32))
+    gameId = int(random.getrandbits(30))
 
     # dirty hack here, set end_time = 1 during initialization so Attack() and 
     # Join() will not work while initialization
