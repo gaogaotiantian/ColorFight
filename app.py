@@ -308,6 +308,7 @@ class InfoDb(db.Model):
     join_end_time = db.Column(db.Float, default = 0)
     ai_only       = db.Column(db.Boolean, default = False)
     last_update   = db.Column(db.Float, default = 0)
+    game_id       = db.Column(db.Integer, default = 0)
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -499,11 +500,13 @@ def StartGame():
     else:
         joinEndTime = 0
 
+    gameId = int(random.getrandbits(32))
+
     # dirty hack here, set end_time = 1 during initialization so Attack() and 
     # Join() will not work while initialization
     i = InfoDb.query.with_for_update().get(0)
     if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, join_end_time = joinEndTime, ai_only = aiOnly, last_update = currTime)
+        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, join_end_time = joinEndTime, ai_only = aiOnly, last_update = currTime, game_id = gameId)
         db.session.add(i)
     else:
         i.width = width
@@ -513,6 +516,7 @@ def StartGame():
         i.join_end_time = joinEndTime
         i.ai_only = aiOnly
         i.last_update = currTime
+        i.game_id = gameId
 
     totalCells = width * height
 
@@ -586,7 +590,7 @@ def GetGameInfo():
     else:
         refreshGame = False
 
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_version':GAME_VERSION}
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION}
 
     db.session.commit()
 
