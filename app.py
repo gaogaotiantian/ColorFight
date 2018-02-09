@@ -679,7 +679,7 @@ def Attack():
         db.session.commit()
         return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
 
-    if GAME_VERSION == 'full' and 'boost' in data and data['boost'] == True:
+    if (GAME_VERSION == 'full' or GAME_VERSION == "mainline") and 'boost' in data and data['boost'] == True:
         boost = True
     else:
         boost = False
@@ -719,7 +719,7 @@ def BuildBase():
 @require('cellx', 'celly', 'token', 'direction', 'blastType', action = True)
 def Blast():
     data = request.get_json()
-    if GAME_VERSION != "full":
+    if GAME_VERSION != "full" and GAME_VERSION != "mainline":
         return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     u = UserDb.query.filter_by(token = data['token']).first()
     cellx = data['cellx']
