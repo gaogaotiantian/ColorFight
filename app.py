@@ -332,6 +332,13 @@ class UserDb(db.Model):
         else:
             db.session.delete(self)
         return True
+    
+    def ToDict(self, simple = False):
+        # Web display will request for a simple version
+        if simple:
+            return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
+        return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "base_num":self.bases, "energy_cell_num":self.energy_cells, "gold_cell_num":self.gold_cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
+        
 
 
 db.create_all()
@@ -570,6 +577,11 @@ def GetGameInfo():
     else:
         print('Info! Get a full cell request.')
 
+    if 'display' in data and data['display'] == True:
+        useSimpleDict = True
+    else:
+        useSimpleDict = False
+
     timeDiff = 0
 
     retInfo = {}
@@ -594,7 +606,7 @@ def GetGameInfo():
     users = UserDb.query.all()
     userInfo = []
     for user in users:
-        userInfo.append({"name":user.name, "id":user.id, "cd_time":user.cd_time, "cell_num":user.cells, "base_num":user.bases, "energy_cell_num":user.energy_cells, "gold_cell_num":user.gold_cells, "energy":user.energy, "gold":user.gold, "dead_time":user.dead_time})
+        userInfo.append(user.ToDict(useSimpleDict))
     db.session.commit()
     retInfo['users'] = userInfo
 

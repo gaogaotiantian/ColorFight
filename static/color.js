@@ -22,7 +22,7 @@ GetGameInfo = function() {
             method: "POST",
             dataType: "json",
             contentType: 'application/json;charset=UTF-8',
-            data: JSON.stringify({'protocol':2}),
+            data: JSON.stringify({'protocol':2, 'display':true}),
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
@@ -46,7 +46,7 @@ GetGameInfo = function() {
             method: "POST",
             dataType: "json",
             contentType: 'application/json;charset=UTF-8',
-            data: JSON.stringify({'protocol':2, 'timeAfter':lastUpdate}),
+            data: JSON.stringify({'protocol':2, 'timeAfter':lastUpdate, 'display':true}),
             success: function(data) {
                 var gameInfo = data;
                 var currTime = gameInfo['info']['time'];
