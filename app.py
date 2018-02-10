@@ -80,10 +80,6 @@ def require(*required_args, **kw_req_args):
                     resp = flask.jsonify(code=400, msg="wrong args! need "+arg)
                     resp.status_code = 400
                     return resp
-                if arg == 'token':
-                    u = UserDb.query.filter_by(token = data['token']).first()
-                    if u == None:
-                        return GetResp((400, {"msg":"user not valid"}))
 
             if kw_req_args != None:
                 if "action" in kw_req_args:
@@ -213,29 +209,27 @@ class CellDb(db.Model):
         user.cd_time = self.finish_time
         return True, None, None
 
-    def BuildBase(self, uid, currTime):
+    def BuildBase(self, user, currTime):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         if self.build_type == "base":
             return False, 6, "This cell is already a base."
-        
-        currBuildBase = CellDb.query.filter(CellDb.owner == uid).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
-        if currBuildBase:
-            return False, 7, "You are already building a base."
-        baseNum = CellDb.query.filter_by(owner = uid, build_type = "base").count()
-        if baseNum >= 3:
-            return False, 8, "You have reached the base number limit"
-        
-        user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             return False, 3, "You are in CD time!"
         if user.gold < goldShop['base']:
             return False, 5, "Not enough gold!"
+        
+        currBuildBase = CellDb.query.filter(CellDb.owner == user.id).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
+        if currBuildBase:
+            return False, 7, "You are already building a base."
+        baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").scalar()
+        if baseNum >= 3:
+            return False, 8, "You have reached the base number limit"
+        
         user.gold = user.gold - goldShop['base']
         self.build_type = "base"
         self.build_time = currTime
         self.build_finish = False
-        db.session.commit()
         return True, None, None
 
     def Blast(self, uid, direction, blastType, currTime):
@@ -668,13 +662,13 @@ def JoinGame():
 def Attack():
     data = request.get_json()
 
+    currTime = GetCurrDbTimeSecs()
     u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
     if u == None:
         db.session.commit()
         return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
     cellx = data['cellx']
     celly = data['celly']
-    currTime = GetCurrDbTimeSecs()
     if u.cd_time > currTime:
         db.session.commit()
         return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
@@ -701,18 +695,22 @@ def Attack():
 @require('cellx', 'celly', 'token', action = True)
 def BuildBase():
     data = request.get_json()
-    u = UserDb.query.filter_by(token = data['token']).first()
+    currTime = GetCurrDbTimeSecs()
+    u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
+    if u == None:
+        db.session.commit()
+        return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
     cellx = data['cellx']
     celly = data['celly']
-    uid = u.id
-    c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
+    c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = u.id).first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.BuildBase(uid, GetCurrDbTimeSecs())
+    success, err_code, msg = c.BuildBase(u, currTime)
+    # user and cell is both locked here, clear the lock
+    db.session.commit()
     if success:
         return GetResp((200, {"err_code":0}))
     else:
-        db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/blast', methods=['POST'])
@@ -722,6 +720,9 @@ def Blast():
     if GAME_VERSION != "full" and GAME_VERSION != "mainline":
         return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     u = UserDb.query.filter_by(token = data['token']).first()
+    if u == None:
+        db.session.commit()
+        return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
     cellx = data['cellx']
     celly = data['celly']
     direction = data['direction']
