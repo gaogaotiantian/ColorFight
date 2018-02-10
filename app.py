@@ -665,7 +665,10 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 0, dead_time = 0)
+    if GAME_VERSION == 'release':
+        newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 0, dead_time = 0)
+    else:
+        newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 30, dead_time = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
