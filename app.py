@@ -214,19 +214,26 @@ class CellDb(db.Model):
             return False, 2, "This cell is being taken."
         if self.build_type == "base":
             return False, 6, "This cell is already a base."
-        if user.cd_time > currTime:
-            return False, 3, "You are in CD time!"
+        if GAME_VERSION == "release":
+            if user.cd_time > currTime:
+                return False, 3, "You are in CD time!"
+
         if user.gold < goldShop['base']:
             return False, 5, "Not enough gold!"
         
-        currBuildBase = CellDb.query.filter(CellDb.owner == user.id).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
-        if currBuildBase:
-            return False, 7, "You are already building a base."
+        if GAME_VERSION == "release":
+            currBuildBase = CellDb.query.filter(CellDb.owner == user.id).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
+            if currBuildBase:
+                return False, 7, "You are already building a base."
+        else:
+            if user.build_cd_time > currTime:
+                return False, 7, "You are in building cd"
         baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").scalar()
         if baseNum >= 3:
             return False, 8, "You have reached the base number limit"
         
         user.gold = user.gold - goldShop['base']
+        user.build_cd_time = currTime + 30
         self.build_type = "base"
         self.build_time = currTime
         self.build_finish = False
@@ -310,6 +317,7 @@ class UserDb(db.Model):
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
     cd_time       = db.Column(db.Integer, default = 0)
+    build_cd_time = db.Column(db.Integer, default = 0)
     cells         = db.Column(db.Integer, default = 0)
     bases         = db.Column(db.Integer, default = 0)
     energy_cells  = db.Column(db.Integer, default = 0)
@@ -337,7 +345,7 @@ class UserDb(db.Model):
         # Web display will request for a simple version
         if simple:
             return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
-        return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "base_num":self.bases, "energy_cell_num":self.energy_cells, "gold_cell_num":self.gold_cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
+        return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "build_cd_time":self.build_cd_time, "cell_num":self.cells, "base_num":self.bases, "energy_cell_num":self.energy_cells, "gold_cell_num":self.gold_cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
         
 
 
@@ -449,13 +457,16 @@ def UpdateGame(currTime, timeDiff):
         else:
             if timeDiff > 0:
                 if user.energy_cells > 0:
-                    user.energy = user.energy + timeDiff * user.energy_cells
+                    user.energy = user.energy + timeDiff * user.energy_cells * 0.5
                     user.energy = min(100, user.energy)
                 else:
                     user.energy = max(user.energy, 0)
 
                 if user.gold_cells > 0:
-                    user.gold = user.gold + timeDiff * user.gold_cells
+                    if GAME_VERSION == "release":
+                        user.gold = user.gold + timeDiff * user.gold_cells
+                    else:
+                        user.gold = user.gold + timeDiff * user.gold_cells * 0.5
                     user.gold = min(100, user.gold)
                 else:
                     user.gold = max(user.gold, 0)
