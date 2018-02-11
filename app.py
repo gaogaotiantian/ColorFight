@@ -191,16 +191,15 @@ class CellDb(db.Model):
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if GAME_VERSION == 'mainline' or GAME_VERSION == "full":
-            if boost == True:
-                if user.energy < energyShop['boost']:
-                    return False, 5, "You don't have enough energy"
-                else:
-                    user.energy -= energyShop['boost']
-                    takeTime = 1
-
-        if user.energy > 0 and self.owner != 0 and user.id != self.owner:
-            user.energy = user.energy * 0.95
+        if boost == True:
+            if user.energy < energyShop['boost']:
+                return False, 5, "You don't have enough energy"
+            else:
+                user.energy -= energyShop['boost']
+                takeTime = 1
+        else:
+            if user.energy > 0 and self.owner != 0 and user.id != self.owner:
+                user.energy = user.energy * 0.95
         self.attacker = user.id
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
@@ -276,7 +275,7 @@ class CellDb(db.Model):
 
         for cell in cells:
             if blastType == 'attack':
-                if (cell.x != self.x or cell.y != self.y) and cell.owner != uid:
+                if (cell.x != self.x or cell.y != self.y) and (cell.owner != uid or (cell.is_taking and cell.attacker != uid)):
                     cell.attacker = 0
                     cell.attack_time = currTime
                     cell.finish_time = currTime + 1
@@ -564,10 +563,9 @@ def StartGame():
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    if GAME_VERSION == 'full' or GAME_VERSION == 'mainline':
-        energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
-        for cell in energyCells:
-            cell.cell_type = 'energy'
+    energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+    for cell in energyCells:
+        cell.cell_type = 'energy'
 
     db.session.commit()
 
@@ -699,7 +697,7 @@ def Attack():
         db.session.commit()
         return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
 
-    if (GAME_VERSION == 'full' or GAME_VERSION == "mainline") and 'boost' in data and data['boost'] == True:
+    if 'boost' in data and data['boost'] == True:
         boost = True
     else:
         boost = False
@@ -743,8 +741,6 @@ def BuildBase():
 @require('cellx', 'celly', 'token', 'direction', 'blastType', action = True)
 def Blast():
     data = request.get_json()
-    if GAME_VERSION != "full" and GAME_VERSION != "mainline":
-        return GetResp((400, {"err_code":20, "err_msg":"Invalid version"}))
     u = UserDb.query.filter_by(token = data['token']).first()
     if u == None:
         db.session.commit()
