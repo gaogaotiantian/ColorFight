@@ -30,6 +30,7 @@ ptyprocess==0.5.2
 pycparser==2.18
 Pygments==2.2.0
 pyOpenSSL==17.3.0
+redis==2.10.6
 requests==2.18.4
 scandir==1.6
 simplegeneric==0.8.1
