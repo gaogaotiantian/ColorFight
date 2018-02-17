@@ -5,6 +5,7 @@ import functools
 import base64
 import cProfile, pstats, StringIO
 import random
+import redis
 
 from line_profiler import LineProfiler
 
@@ -17,6 +18,10 @@ if os.environ.get('DATABASE_URL') != None:
     DATABASE_URL = os.environ.get('DATABASE_URL')
 else:
     DATABASE_URL = "postgresql+psycopg2://gaotian:password@localhost:5432/colorfight"
+if os.environ.get('REDIS_URL') != None:
+    REDIS_URL = os.environ.get('REDIS_URL')
+else:
+    REDIS_URL = None
 if os.environ.get('ADMIN_PASSWORD') != None:
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') 
 else:
@@ -45,6 +50,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
+redisConn = redis.from_url(REDIS_URL)
 if os.environ.get('PROFILE') == 'True':
     pr = LineProfiler()
 else:
@@ -569,6 +575,9 @@ def StartGame():
 
     db.session.commit()
 
+    if redisConn:
+        redisConn.set('gameid', str(gameId))
+
     return GetResp((200, {"msg":"Success"}))
 
 @app.route('/getgameinfo', methods=['POST'])
@@ -769,6 +778,23 @@ def CheckToken():
         return GetResp((200, {"name":u.name, "uid":u.id}))
     return GetResp((400, {"msg":"Fail"}))
     
+
+@app.route('/addai', methods=['POST'])
+@require('name')
+def AddAi():
+    data = request.get_json()
+    name = data['name']
+    availableAI = redisConn.lrange("availableAI", 0, -1)
+    if name in availableAI:
+        redisConn.lpush("aiList", name)
+        return GetResp((200, {"msg":"Success"}))
+    return GetResp((200, {"msg":"Fail"}))
+
+@app.route('/getailist', methods=['POST'])
+def GetAiList():
+    availableAI = redisConn.lrange("availableAI", 0, -1)
+    ret = [name for name in availableAI]
+    return GetResp((200, {"aiList":ret}))
 
 @app.route('/')
 @app.route('/index.html')

@@ -18,12 +18,19 @@
   <div class="container">
     {% if not aiOnly %}
     <div class="row justify-content-end">
-      <div class="col-12 col-md-4 text-right input-group pull-right">
-        <!-- <button id="create">Create Game</button> -->
-        <input id="name" class="form-control" type="text" placeholder="Username"></input>
-        <div class="input-group-btn">
-          <button id="join" class="btn btn-primary">Join Game</button>
-        </div>
+      <div class="col-md-8 text-right pull-right">
+        <form class="form-inline align-items-center">
+          <input id="name" class="form-control" type="text" placeholder="Username"></input>
+          <button id="join" type="button" class="btn btn-primary mx-2">Join Game</button>
+          <div class="form-group ml-2">
+            <select class="custom-select" id="ai_list">
+              <option>ExampleAI</option>
+              <option>2</option>
+              <option>3</option>
+            </select>
+          </div>
+          <button id="addai" type="button" class="btn btn-primary mx-2">Add</button>
+        </form>
       </div>
     </div>
     {% endif %}

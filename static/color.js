@@ -376,15 +376,54 @@ Attack = function(x, y, token) {
 CanvasToXY = function(canvasX, canvasY) {
     return [Math.floor(canvasX/gameStatus.cellSize), Math.floor(canvasY/gameStatus.cellSize)]
 }
+
+UpdateAiList = function() {
+    $.ajax( {
+        url: hostUrl+"getailist",
+        method: "POST",
+        dataType: "json",
+        contentType: 'application/json;charset=UTF-8',
+        data: "",
+        success: function(msg) {
+            console.log(msg);
+            var aiList = msg['aiList'];
+            $('#ai_list').empty();
+            for (i in aiList) {
+                var name = aiList[i];
+                $('#ai_list').append($('<option>').val(name).html(name));
+            }
+        },
+    })
+}
+
+AddAi = function() {
+    var name = $('#ai_list').find(":selected").text();
+    $.ajax( {
+        url: hostUrl+"addai",
+        method: "POST",
+        dataType: "json",
+        contentType: 'application/json;charset=UTF-8',
+        data: JSON.stringify({"name":name}),
+        success: function(msg) {
+        },
+    })
+    
+}
 $(function() {
     var canvas = $('#my_canvas');
     canvas[0].width = canvas.parent().width()
     canvas[0].height = canvas[0].width
     CreateTitle();
+    UpdateAiList();
     GetGameInfo();
 
-    $('#join').click(function() {
+    $('#join').click(function(event) {
+        event.preventDefault();
         JoinGame();
+    })
+    $('#addai').click(function(event) {
+        event.preventDefault();
+        AddAi();
     })
 
     $('#my_canvas').click(function(e) {
