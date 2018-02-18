@@ -94,14 +94,18 @@ UpdateTakeTime = function(cell, currTime) {
 }
 WriteTimeLeft = function(info) {
     var s = '';
+    if (info['plan_start_time'] && info['plan_start_time'] > info['time']) {
+        s += "The game will restart in " + parseInt(info['plan_start_time'] - info['time']).toString();
+        s += ' '
+    }
     if (info['join_end_time'] != 0) {
         if (info['join_end_time'] < info['time']) {
             s += 'No player is allowed to join now!';
         } else {
             s += 'Join time left: ' + parseInt(info['join_end_time'] - info['time']).toString();
         }
+        s += ' '
     }
-    s += ' '
     if (info['end_time'] != 0) {
         if (info['end_time'] < info['time']) {
             s += 'Game ended!';

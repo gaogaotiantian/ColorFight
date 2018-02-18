@@ -307,15 +307,27 @@ class CellDb(db.Model):
 
 class InfoDb(db.Model):
     __tablename__ = 'info'
-    id            = db.Column(db.Integer, primary_key = True)
-    width         = db.Column(db.Integer, default = 0)
-    height        = db.Column(db.Integer, default = 0)
-    max_id        = db.Column(db.Integer, default = 0)         
-    end_time      = db.Column(db.Float, default = 0)
-    join_end_time = db.Column(db.Float, default = 0)
-    ai_only       = db.Column(db.Boolean, default = False)
-    last_update   = db.Column(db.Float, default = 0)
-    game_id       = db.Column(db.Integer, default = 0)
+    id              = db.Column(db.Integer, primary_key = True)
+    width           = db.Column(db.Integer, default = 0)
+    height          = db.Column(db.Integer, default = 0)
+    max_id          = db.Column(db.Integer, default = 0)         
+    end_time        = db.Column(db.Float, default = 0)
+    join_end_time   = db.Column(db.Float, default = 0)
+    ai_only         = db.Column(db.Boolean, default = False)
+    last_update     = db.Column(db.Float, default = 0)
+    game_id         = db.Column(db.Integer, default = 0)
+    plan_start_time = db.Column(db.Float, default = 0)
+
+    def Copy(self, other):
+        self.width = other.width
+        self.height = other.height
+        self.max_id = other.max_id
+        self.end_time = other.end_time
+        self.join_end_time = other.join_end_time
+        self.ai_only = other.ai_only
+        self.last_update = other.last_update
+        self.game_id = other.game_id
+        self.plan_start_time = 0
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -479,62 +491,7 @@ def UpdateGame(currTime, timeDiff):
     for uid in deadUserIds:
         ClearCell(uid)
 
-
-
-#======================================================================
-# Server side code 
-#======================================================================
-@app.route('/startgame', methods=['POST'])
-@require('admin_password', 'last_time', 'ai_join_time')
-def StartGame():
-    data = request.get_json()
-    if data['admin_password'] != ADMIN_PASSWORD:
-        return GetResp((200, {"msg":"Fail"}))
-    softRestart = False
-    if "soft" in data and data["soft"] == True:
-        softRestart = True
-    if "ai_only" in data and data["ai_only"] == True:
-        aiOnly = True
-    else:
-        aiOnly = False
-    width =  30
-    height = 30
-    global globalGameWidth
-    global globalGameHeight
-
-    globalGameWidth = width
-    globalGameHeight = height
-
-    currTime = GetCurrDbTimeSecs()
-    if data['last_time'] != 0:
-        endTime = currTime + data['last_time']
-    else:
-        endTime = 0
-    if data['ai_join_time'] != 0:
-        joinEndTime = currTime + data['ai_join_time']
-    else:
-        joinEndTime = 0
-
-    gameId = int(random.getrandbits(30))
-
-    # dirty hack here, set end_time = 1 during initialization so Attack() and 
-    # Join() will not work while initialization
-    i = InfoDb.query.with_for_update().get(0)
-    if i == None:
-        i = InfoDb(id = 0, width = width, height = height, max_id = width * height, end_time = endTime, join_end_time = joinEndTime, ai_only = aiOnly, last_update = currTime, game_id = gameId)
-        db.session.add(i)
-    else:
-        i.width = width
-        i.height = height
-        i.max_id = width*height
-        i.end_time = endTime
-        i.join_end_time = joinEndTime
-        i.ai_only = aiOnly
-        i.last_update = currTime
-        i.game_id = gameId
-
-    totalCells = width * height
-
+def ClearGame(currTime, softRestart, gameSize):
     if softRestart:
         CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'build_type': "empty", 'build_finish':"true", 'build_time':0})
     else:
@@ -563,6 +520,8 @@ def StartGame():
 
     db.session.commit()
 
+    totalCells = gameSize[0] * gameSize[1]
+
     goldenCells = CellDb.query.order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
     for cell in goldenCells:
         cell.cell_type = 'gold'
@@ -572,6 +531,80 @@ def StartGame():
         cell.cell_type = 'energy'
 
     db.session.commit()
+    
+#======================================================================
+# Server side code 
+#======================================================================
+@app.route('/startgame', methods=['POST'])
+@require('admin_password', 'last_time', 'ai_join_time')
+def StartGame():
+    data = request.get_json()
+    if data['admin_password'] != ADMIN_PASSWORD:
+        return GetResp((200, {"msg":"Fail"}))
+    softRestart = False
+    if "soft" in data and data["soft"] == True:
+        softRestart = True
+    if "ai_only" in data and data["ai_only"] == True:
+        aiOnly = True
+    else:
+        aiOnly = False
+    width  = 30
+    height = 30
+    global globalGameWidth
+    global globalGameHeight
+
+    globalGameWidth = width
+    globalGameHeight = height
+
+    currTime = GetCurrDbTimeSecs()
+    if data['last_time'] != 0:
+        endTime = currTime + data['last_time']
+    else:
+        endTime = 0
+    if data['ai_join_time'] != 0:
+        joinEndTime = currTime + data['ai_join_time']
+    else:
+        joinEndTime = 0
+    
+    plan_start_time = 0
+    if 'plan_start_time' in data and data['plan_start_time'] != 0:
+        plan_start_time = data['plan_start_time']
+        if endTime != 0:
+            endTime += plan_start_time
+        if joinEndTime != 0:
+            joinEndTime += plan_start_time
+        plan_start_time += currTime
+    gameId = int(random.getrandbits(30))
+
+    # dirty hack here, set end_time = 1 during initialization so Attack() and 
+    # Join() will not work while initialization
+    if plan_start_time == 0:
+        infoId = 0
+        i = InfoDb.query.with_for_update().get(infoId)
+    else:
+        infoId = 1
+        i = InfoDb.query.with_for_update().get(infoId)
+    if i == None:
+        i = InfoDb(id = infoId, width = width, height = height, max_id = width * height, end_time = endTime, join_end_time = joinEndTime, ai_only = aiOnly, last_update = currTime, game_id = gameId, plan_start_time = plan_start_time)
+        db.session.add(i)
+    else:
+        i.width = width
+        i.height = height
+        i.max_id = width*height
+        i.end_time = endTime
+        i.join_end_time = joinEndTime
+        i.ai_only = aiOnly
+        i.last_update = currTime
+        i.game_id = gameId
+        i.plan_start_time = plan_start_time
+
+    if plan_start_time == 0:
+        ClearGame(currTime, softRestart, (width, height))
+    else:
+        i = InfoDb.query.with_for_update().get(0)
+        i.plan_start_time = plan_start_time
+        db.session.commit()
+
 
     if redisConn:
         redisConn.set('gameid', str(gameId))
@@ -612,7 +645,12 @@ def GetGameInfo():
     else:
         refreshGame = False
 
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION}
+    if info.plan_start_time != 0 and info.plan_start_time < currTime:
+        infoNext = InfoDb.query.get(1)
+        info.Copy(infoNext)
+        ClearGame(currTime, True, (info.width, info.height))
+
+    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
 
     db.session.commit()
 
