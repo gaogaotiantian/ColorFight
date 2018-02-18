@@ -50,7 +50,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
-redisConn = redis.from_url(REDIS_URL)
+redisConn = None
+if REDIS_URL:
+    redisConn = redis.from_url(REDIS_URL)
 if os.environ.get('PROFILE') == 'True':
     pr = LineProfiler()
 else:
@@ -226,14 +228,21 @@ class CellDb(db.Model):
         if user.build_cd_time > currTime:
             return False, 7, "You are in building cd"
         baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").scalar()
+        earliestCell = None
         if baseNum >= 3:
-            return False, 8, "You have reached the base number limit"
-        
+            if GAME_VERSION == 'release':
+                return False, 8, "You have reached the base number limit"
+            else:
+                earliestCell = CellDb.query.filter_by(owner = user.id, build_type = "base", build_finish = True).order_by(CellDb.build_time).first()
+                earliestCell.build_type = 'empty'
+
         user.gold = user.gold - goldShop['base']
         user.build_cd_time = currTime + 30
         self.build_type = "base"
         self.build_time = currTime
         self.build_finish = False
+        if earliestCell != None:
+            self.build_finish = True
         return True, None, None
 
     def Blast(self, uid, direction, blastType, currTime):
@@ -770,16 +779,19 @@ def CheckToken():
 def AddAi():
     data = request.get_json()
     name = data['name']
-    availableAI = redisConn.lrange("availableAI", 0, -1)
-    if name in availableAI:
-        redisConn.lpush("aiList", name)
-        return GetResp((200, {"msg":"Success"}))
+    if redisConn:
+        availableAI = redisConn.lrange("availableAI", 0, -1)
+        if name in availableAI:
+            redisConn.lpush("aiList", name)
+            return GetResp((200, {"msg":"Success"}))
     return GetResp((200, {"msg":"Fail"}))
 
 @app.route('/getailist', methods=['POST'])
 def GetAiList():
-    availableAI = redisConn.lrange("availableAI", 0, -1)
-    ret = [name for name in availableAI]
+    ret = []
+    if redisConn:
+        availableAI = redisConn.lrange("availableAI", 0, -1)
+        ret = [name for name in availableAI]
     return GetResp((200, {"aiList":ret}))
 
 @app.route('/')
