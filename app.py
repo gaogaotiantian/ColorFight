@@ -219,20 +219,12 @@ class CellDb(db.Model):
             return False, 2, "This cell is being taken."
         if self.build_type == "base":
             return False, 6, "This cell is already a base."
-        if GAME_VERSION == "release":
-            if user.cd_time > currTime:
-                return False, 3, "You are in CD time!"
 
         if user.gold < goldShop['base']:
             return False, 5, "Not enough gold!"
         
-        if GAME_VERSION == "release":
-            currBuildBase = CellDb.query.filter(CellDb.owner == user.id).filter(CellDb.build_finish == False).filter(CellDb.build_type == "base").first() is not None
-            if currBuildBase:
-                return False, 7, "You are already building a base."
-        else:
-            if user.build_cd_time > currTime:
-                return False, 7, "You are in building cd"
+        if user.build_cd_time > currTime:
+            return False, 7, "You are in building cd"
         baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").scalar()
         if baseNum >= 3:
             return False, 8, "You have reached the base number limit"
@@ -468,10 +460,7 @@ def UpdateGame(currTime, timeDiff):
                     user.energy = max(user.energy, 0)
 
                 if user.gold_cells > 0:
-                    if GAME_VERSION == "release":
-                        user.gold = user.gold + timeDiff * user.gold_cells
-                    else:
-                        user.gold = user.gold + timeDiff * user.gold_cells * 0.5
+                    user.gold = user.gold + timeDiff * user.gold_cells * 0.5
                     user.gold = min(100, user.gold)
                 else:
                     user.gold = max(user.gold, 0)
@@ -672,10 +661,7 @@ def JoinGame():
         availableId += 1
 
     token = base64.urlsafe_b64encode(os.urandom(24))
-    if GAME_VERSION == 'release':
-        newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 0, dead_time = 0)
-    else:
-        newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 30, dead_time = 0)
+    newUser = UserDb(id = availableId, name = data['name'], token = token, cells = 1, bases = 1, energy_cells = 0, gold_cells = 0, dirty = False, energy = 0, gold = 30, dead_time = 0)
     db.session.add(newUser)
     db.session.commit()
     cell = CellDb.query.filter_by(is_taking = False, owner = 0).order_by(db.func.random()).with_for_update().limit(1).first()
