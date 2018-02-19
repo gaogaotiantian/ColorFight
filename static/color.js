@@ -155,9 +155,7 @@ ListUsers = function(users, currTime) {
         $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":energyBarWidth, "height":"4px"}));
         var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow);
         $userDiv.append($goldRow);
-        if (gameStatus['info']['game_version'] == 'mainline' || gameStatus['info']['game_version'] == 'full') {
-            $userDiv.append($energyRow);
-        }
+        $userDiv.append($energyRow);
 
         $('#user_list').append($userDiv);
     }
