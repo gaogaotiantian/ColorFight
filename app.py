@@ -675,11 +675,6 @@ def GetGameInfo():
         retInfo['info']['time'] = currTime
         if lastUpdate != None and currTime - float(lastUpdate) < gameRefreshInterval:
             refreshGame = False
-            gameUsersStr = redisConn.get("gameUsers")
-            if gameUsersStr != None:
-                retInfo['users'] = json.loads(gameUsersStr)
-            else:
-                retInfo['users'] = []
         else:
             plan_start_time = redisConn.get("planStartTime")
             if plan_start_time != None and float(plan_start_time) != 0 and float(plan_start_time) < currTime:
@@ -717,22 +712,12 @@ def GetGameInfo():
     if refreshGame:
         UpdateGame(currTime, timeDiff)
 
-    if redisConn:
-        if refreshGame:
-            users = UserDb.query.all()
-            userInfo = []
-            for user in users:
-                userInfo.append(user.ToDict(useSimpleDict))
-            db.session.commit()
-            retInfo['users'] = userInfo
-            redisConn.set('gameUsers', json.dumps(userInfo))
-    else:
-        users = UserDb.query.all()
-        userInfo = []
-        for user in users:
-            userInfo.append(user.ToDict(useSimpleDict))
-        db.session.commit()
-        retInfo['users'] = userInfo
+    users = UserDb.query.all()
+    userInfo = []
+    for user in users:
+        userInfo.append(user.ToDict(useSimpleDict))
+    db.session.commit()
+    retInfo['users'] = userInfo
 
     retCells = []
 
