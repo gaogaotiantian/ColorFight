@@ -659,10 +659,7 @@ def GetGameInfo():
     else:
         print('Info! Get a full cell request.')
 
-    if 'display' in data and data['display'] == True:
-        useSimpleDict = True
-    else:
-        useSimpleDict = False
+    useSimpleDict = False
 
     timeDiff = 0
 
