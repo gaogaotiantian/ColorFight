@@ -37,7 +37,7 @@ GetGameInfo = function() {
                 lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
-            setTimeout(GetGameInfo, 200);
+            setTimeout(GetGameInfo, 400);
         });
         fullInfo = true;
     } else {
@@ -67,7 +67,7 @@ GetGameInfo = function() {
                 lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
-            setTimeout(GetGameInfo, 200);
+            setTimeout(GetGameInfo, 400);
         });
     }
 }
@@ -94,14 +94,18 @@ UpdateTakeTime = function(cell, currTime) {
 }
 WriteTimeLeft = function(info) {
     var s = '';
+    if (info['plan_start_time'] && info['plan_start_time'] > info['time']) {
+        s += "The game will restart in " + parseInt(info['plan_start_time'] - info['time']).toString();
+        s += ' '
+    }
     if (info['join_end_time'] != 0) {
         if (info['join_end_time'] < info['time']) {
             s += 'No player is allowed to join now!';
         } else {
             s += 'Join time left: ' + parseInt(info['join_end_time'] - info['time']).toString();
         }
+        s += ' '
     }
-    s += ' '
     if (info['end_time'] != 0) {
         if (info['end_time'] < info['time']) {
             s += 'Game ended!';
@@ -151,9 +155,7 @@ ListUsers = function(users, currTime) {
         $energyRow.append($("<div>").addClass("progress-bar").attr("role", "progressbar").css({"width":energyBarWidth, "height":"4px"}));
         var $userDiv = $("<div>").addClass("col-12").css({"margin-bottom":"5px"}).append($userRow);
         $userDiv.append($goldRow);
-        if (gameStatus['info']['game_version'] == 'mainline' || gameStatus['info']['game_version'] == 'full') {
-            $userDiv.append($energyRow);
-        }
+        $userDiv.append($energyRow);
 
         $('#user_list').append($userDiv);
     }

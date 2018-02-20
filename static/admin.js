@@ -15,6 +15,7 @@ CreateGame = function(soft) {
             "last_time":parseInt($('#last_time').val()),
             "ai_join_time":parseInt($('#join_time').val()),
             "ai_only":aiOnly,
+            "plan_start_time":parseInt($('#plan_start_time').val()),
             "soft":soft
         }),
         success: function(msg) {
