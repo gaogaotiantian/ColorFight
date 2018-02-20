@@ -6,6 +6,7 @@ import base64
 import cProfile, pstats, StringIO
 import random
 import redis
+import json
 
 from line_profiler import LineProfiler
 
@@ -339,6 +340,9 @@ class InfoDb(db.Model):
         self.game_id = other.game_id
         self.plan_start_time = 0
 
+    def ToDict(self, currTime):
+        return {'width':self.width, 'height':self.height, 'time':currTime, 'end_time':self.end_time, 'join_end_time':self.join_end_time, 'game_id':self.game_id, 'game_version':GAME_VERSION, 'plan_start_time':self.plan_start_time}
+
 class UserDb(db.Model):
     __tablename__ = 'users'
     id            = db.Column(db.Integer, primary_key = True)
@@ -510,7 +514,10 @@ def UpdateGame(currTime, timeDiff):
     for uid in deadUserIds:
         ClearCell(uid)
 
-def ClearGame(currTime, softRestart, gameSize):
+def ClearGame(currTime, softRestart, gameSize, gameId):
+    width = gameSize[0]
+    height = gameSize[1]
+
     if softRestart:
         CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'build_type': "empty", 'build_finish':"true", 'build_time':0})
     else:
@@ -550,6 +557,12 @@ def ClearGame(currTime, softRestart, gameSize):
         cell.cell_type = 'energy'
 
     db.session.commit()
+
+    if redisConn:
+        redisConn.set('gameid', str(gameId))
+        info = InfoDb.query.get(0)
+        redisConn.set('gameInfo', json.dumps(info.ToDict(currTime)))
+        db.session.commit()
     
 #======================================================================
 # Server side code 
@@ -601,6 +614,8 @@ def StartGame():
         infoId = 0
         i = InfoDb.query.with_for_update().get(infoId)
     else:
+        if redisConn:
+            redisConn.set("planStartTime", plan_start_time)
         infoId = 1
         i = InfoDb.query.with_for_update().get(infoId)
     if i == None:
@@ -617,16 +632,17 @@ def StartGame():
         i.game_id = gameId
         i.plan_start_time = plan_start_time
 
+    if redisConn:
+        redisConn.set("lastUpdate", 0)
+
     if plan_start_time == 0:
-        ClearGame(currTime, softRestart, (width, height))
+        ClearGame(currTime, softRestart, (width, height), gameId)
     else:
         i = InfoDb.query.with_for_update().get(0)
         i.plan_start_time = plan_start_time
         db.session.commit()
 
 
-    if redisConn:
-        redisConn.set('gameid', str(gameId))
 
     return GetResp((200, {"msg":"Success"}))
 
@@ -657,27 +673,28 @@ def GetGameInfo():
     # Here we try to use redis to get a better performance
     if redisConn:
         lastUpdate = redisConn.get("lastUpdate")
-        if lastUpdate != None and currTime - float(lastUpdate) > gameRefreshInterval:
+        if lastUpdate == None:
+            return GetResp((400, {"msg": "No game established"}))
+
+        if lastUpdate != None and currTime - float(lastUpdate) < gameRefreshInterval:
             refreshGame = False
-            retInfo['info'] = JSON.loads(redisConn.get("gameInfo"))
-            retInfo['users'] = JSON.loads(redisConn.get("gameUsers"))
+            retInfo['users'] = json.loads(redisConn.get("gameUsers"))
         else:
-            info = InfoDb.query.with_for_update().get(0)
-            if info == None:
-                return GetResp((400, {"msg": "No game established"}))
-            if info.plan_start_time != 0 and info.plan_start_time < currTime:
+            plan_start_time = redisConn.get("planStartTime")
+            if plan_start_time != None and float(plan_start_time) != 0 and float(plan_start_time) < currTime:
+                info = InfoDb.query.with_for_update().get(0)
                 infoNext = InfoDb.query.get(1)
                 info.Copy(infoNext)
-                ClearGame(currTime, True, (info.width, info.height))
-
-            retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
-
+                ClearGame(currTime, True, (info.width, info.height), info.game_id)
+                redisConn.set("planStartTime", 0)
 
             timeDiff = currTime - float(lastUpdate)
             redisConn.set("lastUpdate", currTime)
-            redisConn.set("gameInfo", JSON.dumps(retInfo['info']))
             refreshGame = True
             db.session.commit()
+        retInfo['info'] = json.loads(redisConn.get("gameInfo"))
+        retInfo['info']['time'] = currTime
+        retInfo['info']['plan_start_time'] = plan_start_time
     else:
         info = InfoDb.query.with_for_update().get(0)
         if info == None:
