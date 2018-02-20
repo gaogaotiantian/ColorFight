@@ -431,10 +431,17 @@ def GetCurrDbTime():
     for row in res:
         return row[0]
 
+globalDbTime = 0
+globalServerTime = 0
 def GetCurrDbTimeSecs(dbtime = None):
     if dbtime == None:
         dbtime = GetCurrDbTime()
-    return (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
+    currTime = time.time()
+    if currTime - globalServerTime < 1:
+        return currTime - globalServerTime + globalDbTime
+    globalDbTime = (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
+    globalServerTime = time.time()
+    return globalDbTime
 
 def GetDateTimeFromSecs(secs):
     return datetime.datetime.utcfromtimestamp(secs)
@@ -645,34 +652,68 @@ def GetGameInfo():
 
     retInfo = {}
 
-    info = InfoDb.query.with_for_update().get(0)
-    if info == None:
-        return GetResp((400, {"msg": "No game established"}))
-    if currTime - info.last_update > gameRefreshInterval:
-        timeDiff = currTime - info.last_update
-        info.last_update = currTime    
-        refreshGame = True
+    # Here we try to use redis to get a better performance
+    if redisConn:
+        lastUpdate = redisConn.get("lastUpdate")
+        if lastUpdate != None and currTime - float(lastUpdate) > gameRefreshInterval:
+            refreshGame = False
+            retInfo['info'] = JSON.loads(redisConn.get("gameInfo"))
+            retInfo['users'] = JSON.loads(redisConn.get("gameUsers"))
+        else:
+            info = InfoDb.query.with_for_update().get(0)
+            if info == None:
+                return GetResp((400, {"msg": "No game established"}))
+            if info.plan_start_time != 0 and info.plan_start_time < currTime:
+                infoNext = InfoDb.query.get(1)
+                info.Copy(infoNext)
+                ClearGame(currTime, True, (info.width, info.height))
+
+            retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
+
+
+            timeDiff = currTime - float(lastUpdate)
+            redisConn.set("lastUpdate", currTime)
+            redisConn.set("gameInfo", JSON.dumps(retInfo['info']))
+            refreshGame = True
+            db.session.commit()
     else:
-        refreshGame = False
+        info = InfoDb.query.with_for_update().get(0)
+        if info == None:
+            return GetResp((400, {"msg": "No game established"}))
+        if currTime - info.last_update > gameRefreshInterval:
+            timeDiff = currTime - info.last_update
+            info.last_update = currTime    
+            refreshGame = True
+        else:
+            refreshGame = False
 
-    if info.plan_start_time != 0 and info.plan_start_time < currTime:
-        infoNext = InfoDb.query.get(1)
-        info.Copy(infoNext)
-        ClearGame(currTime, True, (info.width, info.height))
+        if info.plan_start_time != 0 and info.plan_start_time < currTime:
+            infoNext = InfoDb.query.get(1)
+            info.Copy(infoNext)
+            ClearGame(currTime, True, (info.width, info.height))
 
-    retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
+        retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
 
-    db.session.commit()
+        db.session.commit()
 
     if refreshGame:
         UpdateGame(currTime, timeDiff)
 
-    users = UserDb.query.all()
-    userInfo = []
-    for user in users:
-        userInfo.append(user.ToDict(useSimpleDict))
-    db.session.commit()
-    retInfo['users'] = userInfo
+    if redisConn:
+        if refreshGame:
+            users = UserDb.query.all()
+            userInfo = []
+            for user in users:
+                userInfo.append(user.ToDict(useSimpleDict))
+            db.session.commit()
+            retInfo['users'] = userInfo
+    else:
+        users = UserDb.query.all()
+        userInfo = []
+        for user in users:
+            userInfo.append(user.ToDict(useSimpleDict))
+        db.session.commit()
+        retInfo['users'] = userInfo
 
     retCells = []
 
