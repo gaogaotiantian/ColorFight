@@ -37,7 +37,7 @@ GetGameInfo = function() {
                 lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
-            setTimeout(GetGameInfo, 200);
+            setTimeout(GetGameInfo, 400);
         });
         fullInfo = true;
     } else {
@@ -67,7 +67,7 @@ GetGameInfo = function() {
                 lastClientTime = d.getTime()/1000.0;
             },
         }).always(function() {
-            setTimeout(GetGameInfo, 200);
+            setTimeout(GetGameInfo, 400);
         });
     }
 }
