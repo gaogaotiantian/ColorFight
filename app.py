@@ -434,6 +434,8 @@ def GetCurrDbTime():
 globalDbTime = 0
 globalServerTime = 0
 def GetCurrDbTimeSecs(dbtime = None):
+    global globalDbTime
+    global globalServerTime
     if dbtime == None:
         dbtime = GetCurrDbTime()
     currTime = time.time()
