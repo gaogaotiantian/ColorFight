@@ -52,8 +52,6 @@ else:
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-if pr:
-    app.config['SQLALCHEMY_ECHO'] = True
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
@@ -676,9 +674,15 @@ def GetGameInfo():
         if lastUpdate == None:
             return GetResp((400, {"msg": "No game established"}))
 
+        retInfo['info'] = json.loads(redisConn.get("gameInfo"))
+        retInfo['info']['time'] = currTime
         if lastUpdate != None and currTime - float(lastUpdate) < gameRefreshInterval:
             refreshGame = False
-            retInfo['users'] = json.loads(redisConn.get("gameUsers"))
+            gameUsersStr = redisConn.get("gameUsers")
+            if gameUsersStr != None:
+                retInfo['users'] = json.loads(gameUsersStr)
+            else:
+                retInfo['users'] = []
         else:
             plan_start_time = redisConn.get("planStartTime")
             if plan_start_time != None and float(plan_start_time) != 0 and float(plan_start_time) < currTime:
@@ -691,10 +695,8 @@ def GetGameInfo():
             timeDiff = currTime - float(lastUpdate)
             redisConn.set("lastUpdate", currTime)
             refreshGame = True
+            retInfo['info']['plan_start_time'] = plan_start_time
             db.session.commit()
-        retInfo['info'] = json.loads(redisConn.get("gameInfo"))
-        retInfo['info']['time'] = currTime
-        retInfo['info']['plan_start_time'] = plan_start_time
     else:
         info = InfoDb.query.with_for_update().get(0)
         if info == None:
@@ -726,6 +728,7 @@ def GetGameInfo():
                 userInfo.append(user.ToDict(useSimpleDict))
             db.session.commit()
             retInfo['users'] = userInfo
+            redisConn.set('gameUsers', json.dumps(userInfo))
     else:
         users = UserDb.query.all()
         userInfo = []
