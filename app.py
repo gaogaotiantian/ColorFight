@@ -184,16 +184,23 @@ class CellDb(db.Model):
 
     # user is a locked instance of UserDb
     # user CD is ready, checked already
+    # Here we already made sure x and y is valid
     # Do not commit inside this function, it will be done outside of the function
     def Attack(self, user, currTime, boost = False):
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
+        # Query is really expensive, we try to do only one query to finish this
         adjCells = 0
+        adjIds = []
         for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            adjc = CellDb.query.filter_by(x = self.x + d[0], y = self.y + d[1]).first()
-            if adjc != None and adjc.owner == user.id:
-                adjCells += 1
+            xx = self.x + d[0]
+            yy = self.y + d[1]
+            if 0 <= xx < globalGameWidth and 0 <= yy < globalGameHeight:
+                adjIds.append(xx + yy * globalGameWidth)
+
+        adjCells = CellDb.query.filter(CellDb.id.in_(adjIds), CellDb.owner == user.id).count()
+
         if self.owner != user.id and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
@@ -729,13 +736,18 @@ def JoinGame():
 def Attack():
     data = request.get_json()
 
+    cellx = data['cellx']
+    celly = data['celly']
+    width, height = GetGameSize()
+
+    if not (0 <= cellx < width and 0 <= celly < height):
+        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
+
     currTime = GetCurrDbTimeSecs()
     u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
     if u == None:
         db.session.commit()
         return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
-    cellx = data['cellx']
-    celly = data['celly']
     if u.cd_time > currTime:
         db.session.commit()
         return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
@@ -744,12 +756,11 @@ def Attack():
         boost = True
     else:
         boost = False
-    width, height = GetGameSize()
     c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
         db.session.commit()
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Attack(u, GetCurrDbTimeSecs(), boost)
+    success, err_code, msg = c.Attack(u, currTime, boost)
     # This commit is important because cell.Attack() will not commit
     # At this point, c and user should both be locked
     db.session.commit()
