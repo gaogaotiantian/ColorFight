@@ -213,6 +213,7 @@ class CellDb(db.Model):
         self.finish_time = currTime + takeTime
         self.is_taking = True
         self.last_update = currTime
+        self.attack_type = 'normal'
         user.cd_time = self.finish_time
         return True, None, None
 
