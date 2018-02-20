@@ -30,6 +30,10 @@ if os.environ.get('ROOM_PASSWORD') != None and os.environ.get('ROOM_PASSWORD') !
     ROOM_PASSWORD = os.environ.get('ROOM_PASSWORD') 
 else:
     ROOM_PASSWORD = None
+if os.environ.get('PROFILE') == 'True':
+    pr = LineProfiler()
+else:
+    pr = None
 if os.environ.get('PROFILE_INTERVAL') != None:
     pr_interval = int(os.environ.get('PROFILE_INTERVAL'))
 else:
@@ -47,14 +51,12 @@ else:
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+if pr:
+    app.config['SQLALCHEMY_ECHO'] = True
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
 redisConn = redis.from_url(REDIS_URL)
-if os.environ.get('PROFILE') == 'True':
-    pr = LineProfiler()
-else:
-    pr = None
 pr_lastPrint = 0
 protocolVersion = 2
 
