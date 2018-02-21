@@ -71,6 +71,7 @@ energyShop = {
 }
 
 goldShop = {
+    "blastDef": 40,
     "base": 60        
 }
 
@@ -272,10 +273,15 @@ class CellDb(db.Model):
         return True, None, None
 
     def Blast(self, uid, direction, blastType, currTime):
+        energyCost = 0
+        goldCost = 0
         if blastType == 'attack':
             energyCost = energyShop['blastAtk']
         elif blastType == 'defense':
-            energyCost = energyShop['blastDef']
+            if GAME_VERSION ==  "release":
+                energyCost = energyShop['blastDef']
+            else:
+                goldCost = goldShop['blastDef']
         else:
             return False, 1, "Invalid blastType"
 
@@ -302,9 +308,10 @@ class CellDb(db.Model):
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             return False, 3, "You are in CD time!"
-        if user.energy < energyCost:
-            return False, 5, "Not enough energy!"
+        if user.energy < energyCost or user.gold < goldCost:
+            return False, 5, "Not enough energy or gold!"
         user.energy = user.energy - energyCost
+        user.gold = user.gold - goldCost
 
         for cell in cells:
             if blastType == 'attack':
@@ -318,7 +325,10 @@ class CellDb(db.Model):
                 if cell.owner == uid:
                     cell.attacker = uid
                     cell.attack_time = currTime
-                    cell.finish_time = currTime + 2
+                    if GAME_VERSION == "release":
+                        cell.finish_time = currTime + 2
+                    else:
+                        cell.finish_time = currTime + 10
                     cell.is_taking = True
 
         if blastType == 'attack':
