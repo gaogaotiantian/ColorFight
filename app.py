@@ -715,7 +715,7 @@ def GetGameInfo():
 
     # Here we try to use redis to get a better performance
     if redisConn:
-        pipe = redisConn.pipe()
+        pipe = redisConn.pipeline()
         lastUpdate, gameInfoStr, plan_start_time = pipe.get("lastUpdate").get("gameInfo").get("planStartTime").execute()
         if lastUpdate == None:
             return GetResp((400, {"msg": "No game established"}))
@@ -725,7 +725,7 @@ def GetGameInfo():
         if lastUpdate != None and currTime - float(lastUpdate) < gameRefreshInterval:
             refreshGame = False
         else:
-            pipe = redisConn.pipe()
+            pipe = redisConn.pipeline()
             if plan_start_time != None and float(plan_start_time) != 0 and float(plan_start_time) < currTime:
                 info = InfoDb.query.with_for_update().get(0)
                 infoNext = InfoDb.query.get(1)
