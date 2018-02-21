@@ -59,6 +59,7 @@ db = SQLAlchemy(app)
 redisConn = None
 if REDIS_URL:
     redisConn = redis.from_url(REDIS_URL, max_connections=5)
+    print redisConn
 pr_lastPrint = 0
 protocolVersion = 2
 
