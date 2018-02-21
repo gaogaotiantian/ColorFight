@@ -776,6 +776,10 @@ def GetGameInfo():
         retCells.append(c.ToDict(currTime))
 
     retInfo['cells'] = retCells
+    
+    forFunRetInfo = json.dumps(retInfo)
+
+    retInfo = json.loads(forFunRetInfo)
 
     resp = GetResp((200, retInfo))
 
