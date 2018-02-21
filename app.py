@@ -58,7 +58,8 @@ CORS(app)
 db = SQLAlchemy(app)
 redisConn = None
 if REDIS_URL:
-    redisConn = redis.from_url(REDIS_URL, connection_pool = redis.BlockingConnectionPool(max_connections=7))
+    pool = redis.BlockingConnectionPool.from_url(REDIS_URL, max_connections=7)
+    redisConn = redis.Redis(connection_pool = pool)
 pr_lastPrint = 0
 protocolVersion = 2
 
