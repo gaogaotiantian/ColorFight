@@ -783,7 +783,7 @@ def GetGameInfo():
     
     respTemp = flask.jsonify(retInfo)
 
-    retInfo2 = flask.dumps(retInfo)
+    retInfo2 = flask.json.dumps(retInfo)
 
     resp = GetResp((200, retInfo))
 
