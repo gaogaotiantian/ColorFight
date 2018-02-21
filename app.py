@@ -239,8 +239,6 @@ class CellDb(db.Model):
         self.last_update = currTime
         self.attack_type = 'normal'
         user.cd_time = self.finish_time
-        if redisConn:
-            redisConn.hset("cdTime", user.token, self.finish_time)
         return True, None, None
 
     def BuildBase(self, user, currTime):
@@ -599,7 +597,6 @@ def ClearGame(currTime, softRestart, gameSize, gameId):
         redisConn.set('gameid', str(gameId))
         info = InfoDb.query.get(0)
         redisConn.set('gameInfo', json.dumps(info.ToDict(currTime)))
-        redisConn.delete('cdTime')
         db.session.commit()
     
 #======================================================================
@@ -831,13 +828,6 @@ def Attack():
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
 
     currTime = GetCurrDbTimeSecs()
-
-    if redisConn:
-        cdString = redisConn.hget("cdTime", data['token'])
-        if cdString != None:
-            cdTime = float(cdString)
-            if cdTime > currTime:
-                return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
 
     u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
     if u == None:
