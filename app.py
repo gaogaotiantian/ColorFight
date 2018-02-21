@@ -52,6 +52,7 @@ else:
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 app.secret_key = base64.urlsafe_b64encode(os.urandom(24))
 CORS(app)
 db = SQLAlchemy(app)
