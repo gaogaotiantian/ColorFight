@@ -341,7 +341,16 @@ class InfoDb(db.Model):
         self.plan_start_time = 0
 
     def ToDict(self, currTime):
-        return {'width':self.width, 'height':self.height, 'time':currTime, 'end_time':self.end_time, 'join_end_time':self.join_end_time, 'game_id':self.game_id, 'game_version':GAME_VERSION, 'plan_start_time':self.plan_start_time}
+        return {
+            'width':int(self.width), 
+            'height':int(self.height), 
+            'time':float(currTime), 
+            'end_time':float(self.end_time), 
+            'join_end_time':float(self.join_end_time), 
+            'game_id':int(self.game_id), 
+            'game_version':str(GAME_VERSION), 
+            'plan_start_time':float(self.plan_start_time)
+        }
 
 class UserDb(db.Model):
     __tablename__ = 'users'
@@ -377,7 +386,19 @@ class UserDb(db.Model):
         # Web display will request for a simple version
         if simple:
             return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
-        return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "build_cd_time":self.build_cd_time, "cell_num":self.cells, "base_num":self.bases, "energy_cell_num":self.energy_cells, "gold_cell_num":self.gold_cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
+        return {
+            "name":str(self.name), 
+            "id":int(self.id), 
+            "cd_time":int(self.cd_time), 
+            "build_cd_time":int(self.build_cd_time), 
+            "cell_num":int(self.cells), 
+            "base_num":int(self.bases), 
+            "energy_cell_num":int(self.energy_cells), 
+            "gold_cell_num":int(self.gold_cells), 
+            "energy":float(self.energy), 
+            "gold":float(self.gold), 
+            "dead_time":int(self.dead_time)
+        }
         
 
 
