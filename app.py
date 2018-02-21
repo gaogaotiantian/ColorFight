@@ -371,8 +371,8 @@ class UserDb(db.Model):
     id            = db.Column(db.Integer, primary_key = True)
     name          = db.Column(db.String(50))
     token         = db.Column(db.String(32), default = "")
-    cd_time       = db.Column(db.Integer, default = 0)
-    build_cd_time = db.Column(db.Integer, default = 0)
+    cd_time       = db.Column(db.Float, default = 0)
+    build_cd_time = db.Column(db.Float, default = 0)
     cells         = db.Column(db.Integer, default = 0)
     bases         = db.Column(db.Integer, default = 0)
     energy_cells  = db.Column(db.Integer, default = 0)
@@ -380,7 +380,7 @@ class UserDb(db.Model):
     dirty         = db.Column(db.Boolean, default = False)
     energy        = db.Column(db.Float, default = 0)
     gold          = db.Column(db.Float, default = 0)
-    dead_time     = db.Column(db.Integer, default = 0)
+    dead_time     = db.Column(db.Float, default = 0)
 
     # Pre: lock user
     # Post: lock user
@@ -403,15 +403,15 @@ class UserDb(db.Model):
         return {
             "name":str(self.name), 
             "id":int(self.id), 
-            "cd_time":int(self.cd_time), 
-            "build_cd_time":int(self.build_cd_time), 
+            "cd_time":float(self.cd_time), 
+            "build_cd_time":float(self.build_cd_time), 
             "cell_num":int(self.cells), 
             "base_num":int(self.bases), 
             "energy_cell_num":int(self.energy_cells), 
             "gold_cell_num":int(self.gold_cells), 
             "energy":float(self.energy), 
             "gold":float(self.gold), 
-            "dead_time":int(self.dead_time)
+            "dead_time":float(self.dead_time)
         }
         
 
