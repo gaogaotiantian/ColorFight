@@ -160,7 +160,22 @@ class CellDb(db.Model):
         return takeTime
 
     def ToDict(self, currTime):
-        return {'o':self.owner, 'a':self.attacker, 'c':int(self.is_taking), 'x': self.x, 'y':self.y, 'ot':self.occupy_time, 'at':self.attack_time, 'aty':self.attack_type, 't': self.GetTakeTime(currTime), 'f':self.finish_time, 'ct':self.cell_type, 'b':self.build_type, 'bt':self.build_time, 'bf':self.build_finish}
+        return {
+            'o':int(self.owner), 
+            'a':int(self.attacker), 
+            'c':int(self.is_taking), 
+            'x':int(self.x), 
+            'y':int(self.y), 
+            'ot':float(self.occupy_time), 
+            'at':float(self.attack_time), 
+            'aty':str(self.attack_type), 
+            't': self.GetTakeTime(currTime), 
+            'f':float(self.finish_time), 
+            'ct':str(self.cell_type), 
+            'b':str(self.build_type), 
+            'bt':float(self.build_time), 
+            'bf':bool(self.build_finish)
+        }
 
     def Refresh(self, currTime):
         if self.is_taking == True and self.finish_time < currTime:
