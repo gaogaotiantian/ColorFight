@@ -493,11 +493,11 @@ globalServerTime = 0
 def GetCurrDbTimeSecs(dbtime = None):
     global globalDbTime
     global globalServerTime
+    currTime = time.time()
+    if currTime - globalServerTime < 5:
+        return currTime - globalServerTime + globalDbTime
     if dbtime == None:
         dbtime = GetCurrDbTime()
-    currTime = time.time()
-    if currTime - globalServerTime < 1:
-        return currTime - globalServerTime + globalDbTime
     globalDbTime = (dbtime - datetime.datetime(1970,1,1,tzinfo=dbtime.tzinfo)).total_seconds()
     globalServerTime = time.time()
     return globalDbTime
