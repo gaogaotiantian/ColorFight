@@ -59,7 +59,7 @@ CORS(app)
 db = SQLAlchemy(app)
 redisConn = None
 if REDIS_URL:
-    pool = redis.BlockingConnectionPool.from_url(REDIS_URL, max_connections=7)
+    pool = redis.BlockingConnectionPool.from_url(REDIS_URL, max_connections=9)
     redisConn = redis.Redis(connection_pool = pool)
 pr_lastPrint = 0
 protocolVersion = 2
@@ -207,6 +207,10 @@ class CellDb(db.Model):
     # Here we already made sure x and y is valid
     # Do not commit inside this function, it will be done outside of the function
     def Attack(self, user, currTime, boost = False):
+        global pr
+        global gameRefreshInterval
+        if (pr):
+            pr.enable()
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         # Check whether it's adjacent to an occupied cell
@@ -242,6 +246,8 @@ class CellDb(db.Model):
         self.last_update = currTime
         self.attack_type = 'normal'
         user.cd_time = self.finish_time
+        if pr:
+            pr.disable()
         return True, None, None
 
     def BuildBase(self, user, currTime):
@@ -500,6 +506,10 @@ def GetDateTimeFromSecs(secs):
     return datetime.datetime.utcfromtimestamp(secs)
 
 def UpdateGame(currTime, timeDiff):
+    global pr
+    global gameRefreshInterval
+    if (pr):
+        pr.enable()
     # Refresh the cells that needs to be refreshed first because this will
     # lock stuff
     cells = CellDb.query.filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
@@ -560,6 +570,9 @@ def UpdateGame(currTime, timeDiff):
 
     for uid in deadUserIds:
         ClearCell(uid)
+
+    if pr:
+        pr.disable()
 
 def ClearGame(currTime, softRestart, gameSize, gameId):
     width = gameSize[0]
@@ -959,3 +972,5 @@ def Admin():
 
 if pr:
     pr.add_function(GetGameInfo)
+    pr.add_function(CellDb.Attack)
+    pr.add_function(UpdateGame)
