@@ -527,7 +527,7 @@ def UpdateGame(currTime, timeDiff):
             dirtyUserIds[cell.attacker].add('base')
             dirtyUserIds[cell.owner].add('base')
         if cell.cell_type == 'energy':
-            dirtyUserIds[cell.attacker].add('enegry')
+            dirtyUserIds[cell.attacker].add('energy')
             dirtyUserIds[cell.owner].add('energy')
         if cell.cell_type == 'gold':
             dirtyUserIds[cell.attacker].add('gold')
