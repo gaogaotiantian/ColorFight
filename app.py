@@ -571,6 +571,7 @@ def UpdateGame(currTime, timeDiff):
             deadUserIds.append(user.id)
             user.Dead(currTime)
         else:
+            userInfo.append(user.ToDict())
             if timeDiff > 0:
                 if user.energy_cells > 0:
                     user.energy = user.energy + timeDiff * user.energy_cells * 0.5
@@ -591,6 +592,8 @@ def UpdateGame(currTime, timeDiff):
 
     if pr:
         pr.disable()
+
+    return userInfo
 
 def ClearGame(currTime, softRestart, gameSize, gameId):
     width = gameSize[0]
@@ -792,13 +795,14 @@ def GetGameInfo():
         db.session.commit()
 
     if refreshGame:
-        UpdateGame(currTime, timeDiff)
+        userInfo = UpdateGame(currTime, timeDiff)
+    else:
+        users = UserDb.query.all()
+        userInfo = []
+        for user in users:
+            userInfo.append(user.ToDict(useSimpleDict))
+        db.session.commit()
 
-    users = UserDb.query.all()
-    userInfo = []
-    for user in users:
-        userInfo.append(user.ToDict(useSimpleDict))
-    db.session.commit()
     retInfo['users'] = userInfo
 
     retCells = []
