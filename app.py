@@ -514,13 +514,24 @@ def UpdateGame(currTime, timeDiff):
     # lock stuff
     cells = CellDb.query.filter(CellDb.finish_time < currTime).filter_by(is_taking = True).with_for_update().all()
 
-    dirtyUserIds = set()
+    dirtyUserIds = {}
     baseMoveList = []
     for cell in cells:
         owner = cell.owner
         isBase = cell.build_type == "base" and cell.build_finish == True
-        dirtyUserIds.add(cell.attacker)
-        dirtyUserIds.add(cell.owner)
+        if cell.attacker not in dirtyUserIds:
+            dirtyUserIds[cell.attacker] = set()
+        if cell.owner not in dirtyUserIds:
+            dirtyUserIds[cell.owner] = set()
+        if isBase:
+            dirtyUserIds[cell.attacker].add('base')
+            dirtyUserIds[cell.owner].add('base')
+        if cell.cell_type == 'energy':
+            dirtyUserIds[cell.attacker].add('enegry')
+            dirtyUserIds[cell.owner].add('energy')
+        if cell.cell_type == 'gold':
+            dirtyUserIds[cell.attacker].add('gold')
+            dirtyUserIds[cell.owner].add('gold')
         if cell.Refresh(currTime):
             if isBase and owner != cell.owner:
                 baseMoveList.append((owner, cell.x, cell.y))
@@ -530,7 +541,9 @@ def UpdateGame(currTime, timeDiff):
     cells = CellDb.query.filter(CellDb.build_type == "base").filter(CellDb.build_finish == False).filter(CellDb.build_time + 30 <= currTime).with_for_update().all()
     for cell in cells:
         if cell.RefreshBuild(currTime):
-            dirtyUserIds.add(cell.owner)
+            if cell.owner not in dirtyUserIds:
+                dirtyUserIds[cell.owner] = set()
+            dirtyUserIds[cell.owner].add('base')
 
     db.session.commit()
 
@@ -541,13 +554,18 @@ def UpdateGame(currTime, timeDiff):
     deadUserIds = []
     for user in users:
         if user.id in dirtyUserIds:
+            if 'base' in dirtyUserIds[user.id]:
+                user.bases = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").filter(CellDb.build_finish == True).scalar()
+            
+            if 'energy' in dirtyUserIds[user.id]:
+                user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
+
+            if 'gold' in dirtyUserIds[user.id]:
+                user.gold_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
+
             cellNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).scalar()
-            cellNum += 9*db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
+            cellNum += 9*user.gold_cells
             user.cells = cellNum
-            baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").filter(CellDb.build_finish == True).scalar()
-            user.bases = baseNum
-            user.energy_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'energy').scalar()
-            user.gold_cells = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.cell_type == 'gold').scalar()
 
         if user.cells == 0 or user.bases == 0:
             deadUserIds.append(user.id)
