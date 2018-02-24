@@ -761,6 +761,7 @@ def GetGameInfo():
 
         retInfo['info'] = json.loads(gameInfoStr)
         retInfo['info']['time'] = currTime
+        retInfo['info']['plan_start_time'] = plan_start_time
         if lastUpdate != None and currTime - float(lastUpdate) < gameRefreshInterval:
             refreshGame = False
         else:
@@ -776,7 +777,6 @@ def GetGameInfo():
             pipe.set("lastUpdate", currTime)
             pipe.execute()
             refreshGame = True
-            retInfo['info']['plan_start_time'] = plan_start_time
             db.session.commit()
     else:
         info = InfoDb.query.with_for_update().get(0)
