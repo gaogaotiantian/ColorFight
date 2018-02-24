@@ -422,7 +422,7 @@ class UserDb(db.Model):
         if simple:
             return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
         return {
-            "name":self.name.decode("utf-8", "ignore"), 
+            "name":self.name.encode("utf-8", "ignore"), 
             "id":int(self.id), 
             "cd_time":float(self.cd_time), 
             "build_cd_time":float(self.build_cd_time), 
