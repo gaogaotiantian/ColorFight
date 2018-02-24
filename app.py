@@ -600,7 +600,7 @@ def ClearGame(currTime, softRestart, gameSize, gameId):
     height = gameSize[1]
 
     if softRestart:
-        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'last_update' : currTime, 'cell_type': 'normal', 'build_type': "empty", 'build_finish':"true", 'build_time':0})
+        CellDb.query.with_for_update().update({'owner' : 0, 'occupy_time' : 0, 'is_taking' : False, 'attacker' : 0, 'attack_time' : 0, 'attack_type': 'normal', 'last_update' : currTime, 'cell_type': 'normal', 'build_type': "empty", 'build_finish':"true", 'build_time':0})
     else:
         for y in range(height):
             for x in range(width):
@@ -616,6 +616,7 @@ def ClearGame(currTime, softRestart, gameSize, gameId):
                     c.is_taking = False
                     c.attacker = 0
                     c.attack_time = 0
+                    c.attack_type = 'normal'
                     c.last_update = currTime
                     c.cell_type = 'normal'
                     c.build_type = 'empty'
