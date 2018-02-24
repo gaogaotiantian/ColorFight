@@ -235,7 +235,10 @@ class CellDb(db.Model):
                 return False, 5, "You don't have enough energy"
             else:
                 user.energy -= energyShop['boost']
-                takeTime = 1
+                if GAME_VERSION == "release":
+                    takeTime = 1
+                else:
+                    takeTime = max(1, takeTime * 0.1)
         else:
             if user.energy > 0 and self.owner != 0 and user.id != self.owner:
                 user.energy = user.energy * 0.95
@@ -419,7 +422,7 @@ class UserDb(db.Model):
         if simple:
             return {"name":self.name, "id":self.id, "cd_time":self.cd_time, "cell_num":self.cells, "energy":self.energy, "gold":self.gold, "dead_time":self.dead_time}
         return {
-            "name":str(self.name), 
+            "name":self.name.decode("utf-8", "ignore"), 
             "id":int(self.id), 
             "cd_time":float(self.cd_time), 
             "build_cd_time":float(self.build_cd_time), 
