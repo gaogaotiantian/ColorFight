@@ -981,6 +981,9 @@ def GetAiList():
 @app.route('/')
 @app.route('/index.html')
 def Index():
+    if request.url.startswith('https://'):
+        url = request.url.replace('https://', "http://", 1)
+        return redirect(url, 301)
     i = InfoDb.query.get(0)
     if i != None:
         aiOnly = i.ai_only
@@ -990,6 +993,9 @@ def Index():
 
 @app.route('/admin.html')
 def Admin():
+    if request.url.startswith('https://'):
+        url = request.url.replace('https://', "http://", 1)
+        return redirect(url, 301)
     return render_template('admin.html')
 
 if pr:
