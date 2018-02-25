@@ -413,9 +413,10 @@ class UserDb(db.Model):
             self.energy    = 0
             self.gold      = 0
             self.cells     = 0
+            return False
         else:
             db.session.delete(self)
-        return True
+            return True
     
     def ToDict(self, simple = False):
         # Web display will request for a simple version
@@ -572,9 +573,10 @@ def UpdateGame(currTime, timeDiff):
 
         if user.cells == 0 or user.bases == 0:
             deadUserIds.append(user.id)
-            user.Dead(currTime)
+            if not user.Dead(currTime):
+                userInfo.append(user.ToDict())
+
         else:
-            userInfo.append(user.ToDict())
             if timeDiff > 0:
                 if user.energy_cells > 0:
                     user.energy = user.energy + timeDiff * user.energy_cells * 0.5
@@ -587,6 +589,7 @@ def UpdateGame(currTime, timeDiff):
                     user.gold = min(100, user.gold)
                 else:
                     user.gold = max(user.gold, 0)
+            userInfo.append(user.ToDict())
 
     db.session.commit()
 
