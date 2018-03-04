@@ -127,6 +127,9 @@ ListUsers = function(users, currTime) {
             } else if (b['dead_time'] == 0) {
                 return 1;
             } else {
+                if (b['cell_num'] == a['cell_num']) {
+                    return b['dead_time'] - a['dead_time'];
+                }
                 return b['cell_num'] - a['cell_num'];
             }
         }
