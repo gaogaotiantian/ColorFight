@@ -117,22 +117,21 @@ WriteTimeLeft = function(info) {
 }
 ListUsers = function(users, currTime) {
     $('#user_list').empty();
+    console.log(users)
     users = users.sort(function(a,b) { 
-        if (a['cell_num'] > b['cell_num']) {
-            return -1;
-        } else if (a['cell_num'] < b['cell_num']) {
-            return 1;
-        } else if (a['dead_time'] > b['dead_time']) {
-            return -1;
-        } else if (a['dead_time'] < b['dead_time']) {
-            return 1;
-        } else if (a['id'] > b['id']) {
-            return -1;
-        } else if (a['id'] < b['id']) {
-            return 1;
+        if (a['dead_time'] == 0 && b['dead_time'] == 0) {
+            return b['cell_num'] - a['cell_num'];
+        } else {
+            if (a['dead_time'] == 0) {
+                return -1;
+            } else if (b['dead_time'] == 0) {
+                return 1;
+            } else {
+                return b['cell_num'] - a['cell_num'];
+            }
         }
         return 0;
-    });
+    })
     for (idx in users) {
         user = users[idx];
         var $userRow = $("<div>").addClass("row user-row").attr("uid", user['id']);

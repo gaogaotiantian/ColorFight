@@ -412,7 +412,6 @@ class UserDb(db.Model):
             self.token     = ""
             self.energy    = 0
             self.gold      = 0
-            self.cells     = 0
             return False
         else:
             db.session.delete(self)
