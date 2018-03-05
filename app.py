@@ -384,7 +384,8 @@ class InfoDb(db.Model):
             'join_end_time':float(self.join_end_time), 
             'game_id':int(self.game_id), 
             'game_version':str(GAME_VERSION), 
-            'plan_start_time':float(self.plan_start_time)
+            'plan_start_time':float(self.plan_start_time),
+            'ai_only':bool(self.ai_only)
         }
 
 class UserDb(db.Model):
@@ -570,7 +571,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum += 9*user.gold_cells
             user.cells = cellNum
 
-        if user.cells == 0 or user.bases == 0:
+        if (user.cells == 0 or user.bases == 0) and user.dead_time != 0:
             deadUserIds.append(user.id)
             if not user.Dead(currTime):
                 userInfo.append(user.ToDict())
