@@ -73,7 +73,7 @@ GetGameInfo = function() {
     if (gameStatus['info']['ai_only']) {
         $('#join_div').css("display", "none");
     } else {
-        $('#join_div').css("display", "inline");
+        $('#join_div').css("display", "flex");
     }
 }
 GetTakeTimeEq = function(timeDiff) {
