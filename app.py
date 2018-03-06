@@ -571,7 +571,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum += 9*user.gold_cells
             user.cells = cellNum
 
-        if (user.cells == 0 or user.bases == 0) and user.dead_time != 0:
+        if (user.cells == 0 or user.bases == 0) and user.dead_time == 0:
             deadUserIds.append(user.id)
             if not user.Dead(currTime):
                 userInfo.append(user.ToDict())
@@ -795,7 +795,7 @@ def GetGameInfo():
         if info.plan_start_time != 0 and info.plan_start_time < currTime:
             infoNext = InfoDb.query.get(1)
             info.Copy(infoNext)
-            ClearGame(currTime, True, (info.width, info.height))
+            ClearGame(currTime, True, (info.width, info.height), info.game_id)
 
         retInfo['info'] = {'width':info.width, 'height':info.height, 'time':currTime, 'end_time':info.end_time, 'join_end_time':info.join_end_time, 'game_id':info.game_id, 'game_version':GAME_VERSION, 'plan_start_time':info.plan_start_time}
 
