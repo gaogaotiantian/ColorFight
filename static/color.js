@@ -188,7 +188,7 @@ DrawGame = function() {
         gameStatus['globalDirty'] = true;
     }
 
-    gameStatus.cellSize = Math.floor(w/info['width']);
+    gameStatus.cellSize = w/info['width'];
     var width = info['width'];
     var height = info['height'];
 
