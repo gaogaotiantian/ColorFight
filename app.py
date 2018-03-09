@@ -409,10 +409,13 @@ class UserDb(db.Model):
     def Dead(self, currTime):
         info = InfoDb.query.get(0);
         if info.end_time != 0:
-            self.dead_time = currTime
-            self.token     = ""
-            self.energy    = 0
-            self.gold      = 0
+            self.dead_time    = currTime
+            self.token        = ""
+            self.energy       = 0
+            self.gold         = 0
+            self.energy_cells = 0
+            self.gold_cells   = 0
+            self.bases        = 0
             return False
         else:
             db.session.delete(self)
