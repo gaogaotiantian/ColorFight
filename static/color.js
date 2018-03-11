@@ -122,7 +122,6 @@ WriteTimeLeft = function(info) {
 }
 ListUsers = function(users, currTime) {
     $('#user_list').empty();
-    console.log(users)
     users = users.sort(function(a,b) { 
         if (a['dead_time'] == 0 && b['dead_time'] == 0) {
             return b['cell_num'] - a['cell_num'];
