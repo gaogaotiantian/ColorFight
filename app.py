@@ -817,7 +817,9 @@ def GetGameInfo():
 
     retCells = []
 
-    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter)).order_by(CellDb.id).all()
+    # We give a 0.5 sec buffer so it will have a higher chance to pick up
+    # all the changes even with some delay
+    changedCells = CellDb.query.filter(CellDb.timestamp >= GetDateTimeFromSecs(timeAfter - 0.5)).order_by(CellDb.id).all()
     for c in changedCells:
         retCells.append(c.ToDict(currTime))
 
