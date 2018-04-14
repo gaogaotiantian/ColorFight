@@ -148,7 +148,7 @@ class CellDb(db.Model):
         if GAME_VERSION == 'full':
             self.build_type = "base"
         else:
-            self.build_time = "normal"
+            self.build_type = "normal"
         self.build_finish = True
 
     def GetTakeTimeEq(self, timeDiff):
@@ -651,9 +651,10 @@ def ClearGame(currTime, softRestart, gameSize, gameId):
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
-    for cell in energyCells:
-        cell.cell_type = 'energy'
+    if GAME_VERSION == 'full':
+        energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
+        for cell in energyCells:
+            cell.cell_type = 'energy'
 
     db.session.commit()
 
