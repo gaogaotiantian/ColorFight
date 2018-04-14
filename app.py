@@ -145,7 +145,10 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        self.build_type = "base"
+        if GAME_VERSION == 'full':
+            self.build_type = "base"
+        else:
+            self.build_time = "normal"
         self.build_finish = True
 
     def GetTakeTimeEq(self, timeDiff):
@@ -230,18 +233,19 @@ class CellDb(db.Model):
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if boost == True:
-            if user.energy < energyShop['boost']:
-                return False, 5, "You don't have enough energy"
-            else:
-                user.energy -= energyShop['boost']
-                if GAME_VERSION == "release":
-                    takeTime = 1
+        if GAME_VERSION == "full":
+            if boost == True:
+                if user.energy < energyShop['boost']:
+                    return False, 5, "You don't have enough energy"
                 else:
-                    takeTime = max(1, takeTime * 0.1)
-        else:
-            if user.energy > 0 and self.owner != 0 and user.id != self.owner:
-                user.energy = user.energy * 0.95
+                    user.energy -= energyShop['boost']
+                    if GAME_VERSION == "release":
+                        takeTime = 1
+                    else:
+                        takeTime = max(1, takeTime * 0.1)
+            else:
+                if user.energy > 0 and self.owner != 0 and user.id != self.owner:
+                    user.energy = user.energy * 0.95
         self.attacker = user.id
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
@@ -254,6 +258,8 @@ class CellDb(db.Model):
         return True, None, None
 
     def BuildBase(self, user, currTime):
+        if GAME_VERSION != "full":
+            return True, None, None
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         if self.build_type == "base":
@@ -285,6 +291,8 @@ class CellDb(db.Model):
     def Blast(self, uid, direction, blastType, currTime):
         energyCost = 0
         goldCost = 0
+        if GAME_VERSION != 'full':
+            return True, None, None
         if blastType == 'attack':
             energyCost = energyShop['blastAtk']
         elif blastType == 'defense':
@@ -574,7 +582,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum += 9*user.gold_cells
             user.cells = cellNum
 
-        if (user.cells == 0 or user.bases == 0) and user.dead_time == 0:
+        if (user.cells == 0 or (GAME_VERSION == 'full' and user.bases == 0)) and user.dead_time == 0:
             deadUserIds.append(user.id)
             if not user.Dead(currTime):
                 userInfo.append(user.ToDict())
@@ -587,7 +595,7 @@ def UpdateGame(currTime, timeDiff):
                 else:
                     user.energy = max(user.energy, 0)
 
-                if user.gold_cells > 0:
+                if GAME_VERSION == 'full' and user.gold_cells > 0:
                     user.gold = user.gold + timeDiff * user.gold_cells * 0.5
                     user.gold = min(100, user.gold)
                 else:
