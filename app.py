@@ -145,7 +145,7 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        if GAME_VERSION == 'full':
+        if GAME_VERSION != 'release':
             self.build_type = "base"
         else:
             self.build_type = "normal"
@@ -258,7 +258,7 @@ class CellDb(db.Model):
         return True, None, None
 
     def BuildBase(self, user, currTime):
-        if GAME_VERSION != "full":
+        if GAME_VERSION == "release":
             return True, None, None
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
@@ -582,7 +582,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum += 9*user.gold_cells
             user.cells = cellNum
 
-        if (user.cells == 0 or (GAME_VERSION == 'full' and user.bases == 0)) and user.dead_time == 0:
+        if (user.cells == 0 or (GAME_VERSION != 'release' and user.bases == 0)) and user.dead_time == 0:
             deadUserIds.append(user.id)
             if not user.Dead(currTime):
                 userInfo.append(user.ToDict())
@@ -595,7 +595,7 @@ def UpdateGame(currTime, timeDiff):
                 else:
                     user.energy = max(user.energy, 0)
 
-                if GAME_VERSION == 'full' and user.gold_cells > 0:
+                if GAME_VERSION != 'release' and user.gold_cells > 0:
                     user.gold = user.gold + timeDiff * user.gold_cells * 0.5
                     user.gold = min(100, user.gold)
                 else:
