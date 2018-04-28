@@ -72,7 +72,7 @@ energyShop = {
 }
 
 goldShop = {
-    "multiattack": 1,
+    "multiattack": 40,
     "blastDef": 40,
     "base": 60        
 }
