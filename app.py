@@ -729,7 +729,7 @@ def GetGameInfo():
     data = request.get_json()
 
     timeAfter = 0
-    if 'timeAfter' in data:
+    if data and 'timeAfter' in data:
         timeAfter = data['timeAfter']
     else:
         print('Info! Get a full cell request.')
