@@ -72,9 +72,32 @@ energyShop = {
 }
 
 goldShop = {
+    "multiattack": 1,
     "blastDef": 40,
     "base": 60        
 }
+
+# Features for the game
+BASE_ENABLE = True
+GOLD_ENABLE = True
+ENERGY_ENABLE = True
+BOOST_ENABLE = True
+BLAST_ENABLE = True
+MULTIATTACK_ENABLE = True
+if GAME_VERSION == 'release':
+    BASE_ENABLE = True
+    GOLD_ENABLE = True
+    ENERGY_ENABLE = False
+    BOOST_ENABLE = False
+    BLAST_ENABLE = False
+    MULTIATTACK_ENABLE = False
+elif GAME_VERSION == 'mainline' or GAME_VERSION == 'full':
+    BASE_ENABLE = True
+    GOLD_ENABLE = True
+    ENERGY_ENABLE = True
+    BOOST_ENABLE = True
+    BLAST_ENABLE = True
+    MULTIATTACK_ENABLE = True
 
 # ============================================================================
 #                                 Decoreator
@@ -145,7 +168,7 @@ class CellDb(db.Model):
         self.finish_time = currTime
         self.attacker = owner
         self.build_time = 0
-        if GAME_VERSION != 'release':
+        if BASE_ENABLE:
             self.build_type = "base"
         else:
             self.build_type = "normal"
@@ -209,40 +232,27 @@ class CellDb(db.Model):
     # user CD is ready, checked already
     # Here we already made sure x and y is valid
     # Do not commit inside this function, it will be done outside of the function
-    def Attack(self, user, currTime, boost = False):
+    def Attack(self, user, currTime, boost = False, adjCells = 0):
         global pr
         global gameRefreshInterval
         if (pr):
             pr.enable()
+
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
-        # Check whether it's adjacent to an occupied cell
-        # Query is really expensive, we try to do only one query to finish this
-        adjCells = 0
-        adjIds = []
-        for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            xx = self.x + d[0]
-            yy = self.y + d[1]
-            if 0 <= xx < globalGameWidth and 0 <= yy < globalGameHeight:
-                adjIds.append(xx + yy * globalGameWidth)
-
-        adjCells = CellDb.query.filter(CellDb.id.in_(adjIds), CellDb.owner == user.id).count()
 
         if self.owner != user.id and adjCells == 0:
             return False, 1, "Cell position invalid or it's not adjacent to your cell."
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if GAME_VERSION == "full":
+        if BOOST_ENABLE:
             if boost == True:
                 if user.energy < energyShop['boost']:
                     return False, 5, "You don't have enough energy"
                 else:
                     user.energy -= energyShop['boost']
-                    if GAME_VERSION == "release":
-                        takeTime = 1
-                    else:
-                        takeTime = max(1, takeTime * 0.1)
+                    takeTime = max(1, takeTime * 0.1)
             else:
                 if user.energy > 0 and self.owner != 0 and user.id != self.owner:
                     user.energy = user.energy * 0.95
@@ -252,59 +262,36 @@ class CellDb(db.Model):
         self.is_taking = True
         self.last_update = currTime
         self.attack_type = 'normal'
-        user.cd_time = self.finish_time
+        user.cd_time = max(user.cd_time, self.finish_time)
         if pr:
             pr.disable()
         return True, None, None
 
     def BuildBase(self, user, currTime):
-        if GAME_VERSION == "release":
+        if not BASE_ENABLE:
             return True, None, None
         if self.is_taking == True:
             return False, 2, "This cell is being taken."
         if self.build_type == "base":
             return False, 6, "This cell is already a base."
 
-        if user.gold < goldShop['base']:
-            return False, 5, "Not enough gold!"
-        
-        if user.build_cd_time > currTime:
-            return False, 7, "You are in building cd"
-        baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == user.id).filter(CellDb.build_type == "base").scalar()
-        earliestCell = None
-        if baseNum >= 3:
-            if GAME_VERSION == 'release':
-                return False, 8, "You have reached the base number limit"
-            else:
-                earliestCell = CellDb.query.filter_by(owner = user.id, build_type = "base", build_finish = True).order_by(CellDb.build_time).first()
-                earliestCell.build_type = 'empty'
-
         user.gold = user.gold - goldShop['base']
         user.build_cd_time = currTime + 30
         self.build_type = "base"
         self.build_time = currTime
         self.build_finish = False
-        if earliestCell != None:
-            self.build_finish = True
         return True, None, None
 
-    def Blast(self, uid, direction, blastType, currTime):
+    def Blast(self, uid, direction, currTime):
         energyCost = 0
         goldCost = 0
-        if GAME_VERSION != 'full':
+        if not BLAST_ENABLE:
             return True, None, None
-        if blastType == 'attack':
-            energyCost = energyShop['blastAtk']
-        elif blastType == 'defense':
-            if GAME_VERSION ==  "release":
-                energyCost = energyShop['blastDef']
-            else:
-                goldCost = goldShop['blastDef']
-        else:
-            return False, 1, "Invalid blastType"
+        energyCost = energyShop['blastAtk']
 
-        if blastType == 'attack' and self.owner != uid:
+        if self.owner != uid:
             return False, 1, "Cell position invalid!"
+
         if direction == "square":
             db.session.commit()
             cells = CellDb.query.filter(CellDb.x >= self.x - 1).filter(CellDb.x <= self.x + 1)\
@@ -326,33 +313,19 @@ class CellDb(db.Model):
         user = UserDb.query.with_for_update().get(uid)
         if user.cd_time > currTime:
             return False, 3, "You are in CD time!"
-        if user.energy < energyCost or user.gold < goldCost:
-            return False, 5, "Not enough energy or gold!"
+        if user.energy < energyCost:
+            return False, 5, "Not enough energy!"
         user.energy = user.energy - energyCost
-        user.gold = user.gold - goldCost
 
         for cell in cells:
-            if blastType == 'attack':
-                if (cell.x != self.x or cell.y != self.y) and (cell.owner != uid or (cell.is_taking and cell.attacker != uid)):
-                    cell.attacker = 0
-                    cell.attack_time = currTime
-                    cell.finish_time = currTime + 1
-                    cell.attack_type = 'blast'
-                    cell.is_taking = True
-            elif blastType == 'defense':
-                if cell.owner == uid:
-                    cell.attacker = uid
-                    cell.attack_time = currTime
-                    if GAME_VERSION == "release":
-                        cell.finish_time = currTime + 2
-                    else:
-                        cell.finish_time = currTime + 10
-                    cell.is_taking = True
+            if (cell.x != self.x or cell.y != self.y) and (cell.owner != uid or (cell.is_taking and cell.attacker != uid)):
+                cell.attacker = 0
+                cell.attack_time = currTime
+                cell.finish_time = currTime + 1
+                cell.attack_type = 'blast'
+                cell.is_taking = True
 
-        if blastType == 'attack':
-            user.cd_time = currTime + 1
-        elif blastType == 'defense':
-            user.cd_time = currTime + 2
+        user.cd_time = currTime + 1
 
         db.session.commit()
         return True, None, None
@@ -582,7 +555,7 @@ def UpdateGame(currTime, timeDiff):
             cellNum += 9*user.gold_cells
             user.cells = cellNum
 
-        if (user.cells == 0 or (GAME_VERSION != 'release' and user.bases == 0)) and user.dead_time == 0:
+        if (user.cells == 0 or (BASE_ENABLE and user.bases == 0)) and user.dead_time == 0:
             deadUserIds.append(user.id)
             if not user.Dead(currTime):
                 userInfo.append(user.ToDict())
@@ -595,7 +568,7 @@ def UpdateGame(currTime, timeDiff):
                 else:
                     user.energy = max(user.energy, 0)
 
-                if GAME_VERSION != 'release' and user.gold_cells > 0:
+                if GOLD_ENABLE and user.gold_cells > 0:
                     user.gold = user.gold + timeDiff * user.gold_cells * 0.5
                     user.gold = min(100, user.gold)
                 else:
@@ -651,7 +624,7 @@ def ClearGame(currTime, softRestart, gameSize, gameId):
     for cell in goldenCells:
         cell.cell_type = 'gold'
 
-    if GAME_VERSION == 'full':
+    if ENERGY_ENABLE:
         energyCells = CellDb.query.filter_by(cell_type = 'normal').order_by(db.func.random()).with_for_update().limit(int(0.02*totalCells))
         for cell in energyCells:
             cell.cell_type = 'energy'
@@ -911,11 +884,25 @@ def Attack():
         boost = True
     else:
         boost = False
+
+    # Check whether it's adjacent to an occupied cell
+    # Query is really expensive, we try to do only one query to finish this
+    adjCells = 0
+    adjIds = []
+    for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        xx = cellx + d[0]
+        yy = celly + d[1]
+        if 0 <= xx < globalGameWidth and 0 <= yy < globalGameHeight:
+            adjIds.append(xx + yy * globalGameWidth)
+
+    adjCells = CellDb.query.filter(CellDb.id.in_(adjIds), CellDb.owner == u.id).count()
+
+
     c = CellDb.query.with_for_update().get(cellx + celly*width)
     if c == None:
         db.session.commit()
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Attack(u, currTime, boost)
+    success, err_code, msg = c.Attack(u, currTime, boost, adjCells)
     # This commit is important because cell.Attack() will not commit
     # At this point, c and user should both be locked
     db.session.commit()
@@ -927,12 +914,26 @@ def Attack():
 @app.route('/buildbase', methods=['POST'])
 @require('cellx', 'celly', 'token', action = True)
 def BuildBase():
+    if not BASE_ENABLE:
+        return GetResp((200, {"err_code":0}))
     data = request.get_json()
     currTime = GetCurrDbTimeSecs()
     u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
     if u == None:
         db.session.commit()
         return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
+
+    if u.gold < goldShop['base']:
+        return GetResp((200, {"err_code": 5, "err_msg":"Not enough gold!"}))
+    
+    if u.build_cd_time > currTime:
+        return GetResp((200, {"err_code": 7, "err_msg":"You are in building cd"}))
+
+    baseNum = db.session.query(db.func.count(CellDb.id)).filter(CellDb.owner == u.id).filter(CellDb.build_type == "base").scalar()
+
+    if baseNum >= 3:
+        return GetResp((200, {"err_code": 8, "err_msg":"You have reached the base number limit"}))
+
     cellx = data['cellx']
     celly = data['celly']
     c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = u.id).first()
@@ -947,8 +948,10 @@ def BuildBase():
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
 
 @app.route('/blast', methods=['POST'])
-@require('cellx', 'celly', 'token', 'direction', 'blastType', action = True)
+@require('cellx', 'celly', 'token', 'direction', action = True)
 def Blast():
+    if not BLAST_ENABLE:
+        return GetResp((200, {"err_code":0}))
     data = request.get_json()
     u = UserDb.query.filter_by(token = data['token']).first()
     if u == None:
@@ -957,17 +960,83 @@ def Blast():
     cellx = data['cellx']
     celly = data['celly']
     direction = data['direction']
-    blastType = data['blastType']
     uid = u.id
     c = CellDb.query.with_for_update().filter_by(x = cellx, y = celly, owner = uid).first()
     if c == None:
         return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
-    success, err_code, msg = c.Blast(uid, direction, blastType, GetCurrDbTimeSecs())
+    success, err_code, msg = c.Blast(uid, direction, GetCurrDbTimeSecs())
     if success:
         return GetResp((200, {"err_code":0}))
     else:
         db.session.commit()
         return GetResp((200, {"err_code":err_code, "err_msg":msg}))
+
+@app.route('/multiattack', methods=['POST'])
+@require('cellx', 'celly', 'token', action = True)
+def MultiAttack():
+    if not MULTIATTACK_ENABLE:
+        return GetResp((200, {"err_code":0}))
+    data = request.get_json()
+
+    cellx = data['cellx']
+    celly = data['celly']
+    width, height = GetGameSize()
+
+    if not (0 <= cellx < width and 0 <= celly < height):
+        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell position"}))
+
+    currTime = GetCurrDbTimeSecs()
+
+    u = UserDb.query.with_for_update().filter_by(token = data['token']).first()
+    if u == None:
+        db.session.commit()
+        return GetResp((200, {"err_code":21, "err_msg":"Invalid player"}))
+    if u.cd_time > currTime:
+        db.session.commit()
+        return GetResp((200, {"err_code":3, "err_msg":"You are in CD time!"}))
+    if u.gold < goldShop['multiattack']:
+        return GetResp((200, {"err_code":5, "err_msg":"Not enough gold!"}))
+
+    # Check whether it's adjacent to an occupied cell
+    # Query is really expensive, we try to do only one query to finish this
+    adjCells = []
+    adjIds = []
+    for d in [(-2, 0), (-1, -1), (0, -2), (1, -1), (2, 0), (1, 1), (0, 2), (-1, 1), (0, 0)]:
+        xx = cellx + d[0]
+        yy = celly + d[1]
+        if 0 <= xx < globalGameWidth and 0 <= yy < globalGameHeight:
+            adjIds.append(xx + yy*globalGameWidth)
+    adjCells = CellDb.query.filter(CellDb.id.in_(adjIds)).filter_by(owner = u.id).all()
+
+    atkCells = []
+    atkIds = []
+    adjCellDict = {}
+    for d in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        xx = cellx + d[0]
+        yy = celly + d[1]
+
+        if 0 <= xx < globalGameWidth and 0 <= yy < globalGameHeight:
+            adjCellCount = 0
+            for c in adjCells:
+                if abs(c.x - xx) + abs(c.y-yy) == 1:
+                    adjCellCount += 1
+            atkId = xx + yy * globalGameWidth
+            atkIds.append(atkId)
+            adjCellDict[atkId] = adjCellCount
+
+    atkCells = CellDb.query.with_for_update().filter(CellDb.id.in_(atkIds)).all()
+
+    if not atkCells:
+        db.session.commit()
+        return GetResp((200, {"err_code":1, "err_msg":"Invalid cell"}))
+
+    for c in atkCells:
+        c.Attack(u, currTime, False, adjCellDict[c.id])
+    u.gold -= goldShop['multiattack']
+    # This commit is important because cell.Attack() will not commit
+    # At this point, c and user should both be locked
+    db.session.commit()
+    return GetResp((200, {"err_code":0}))
 
 @app.route('/checktoken', methods=['POST'])
 @require('token')
