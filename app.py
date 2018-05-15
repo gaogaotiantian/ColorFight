@@ -67,7 +67,7 @@ protocolVersion = 2
 energyShop = {
     "blastAtk": 30,
     "blastDef": 40,
-    "boost": 10,
+    "boost": 15,
     "attack": 2
 }
 
@@ -252,7 +252,7 @@ class CellDb(db.Model):
                     return False, 5, "You don't have enough energy"
                 else:
                     user.energy -= energyShop['boost']
-                    takeTime = max(1, takeTime * 0.1)
+                    takeTime = max(1, takeTime * 0.25)
             else:
                 if user.energy > 0 and self.owner != 0 and user.id != self.owner:
                     user.energy = user.energy * 0.95
