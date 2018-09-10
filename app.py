@@ -19,7 +19,7 @@ if os.environ.get('DATABASE_URL') != None:
     DATABASE_URL = os.environ.get('DATABASE_URL')
 else:
     DATABASE_URL = "postgresql+psycopg2://gaotian:password@localhost:5432/colorfight"
-if os.environ.get('REDIS_URL') != None:
+if os.environ.get('REDISCLOUD_URL') != None:
     REDIS_URL = os.environ.get('REDISCLOUD_URL')
 else:
     REDIS_URL = None
