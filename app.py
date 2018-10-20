@@ -99,6 +99,28 @@ elif GAME_VERSION == 'mainline' or GAME_VERSION == 'full':
     BLAST_ENABLE = True
     MULTIATTACK_ENABLE = True
 
+if os.environ.get('GAME_FEATURE') != None:
+    try: 
+        features = json.loads(os.environ.get('GAME_FEATURE'))
+        for feature, enable in features.items():
+            if type(enable) != bool:
+                raise Exception("You need bool setting")
+            if feature.lower() == 'base':
+                BASE_ENABLE = enable
+            elif feature.lower() == 'gold':
+                GOLD_ENABLE = enable
+            elif feature.lower() == 'energy':
+                ENERGY_ENABLE = enable
+            elif feature.lower() == 'boost':
+                BOOST_ENABLE = enable
+            elif feature.lower() == 'blast':
+                BLAST_ENABLE = enable
+            elif feature.lower() == 'multiattack':
+                MULTIATTACK_ENABLE = enable
+    except Exception as e:
+        print(e)
+        print("Failed to set up using features")
+
 # ============================================================================
 #                                 Decoreator
 # ============================================================================ 
