@@ -193,7 +193,7 @@ class CellDb(db.Model):
         if BASE_ENABLE:
             self.build_type = "base"
         else:
-            self.build_type = "normal"
+            self.build_type = "empty"
         self.build_finish = True
 
     def GetTakeTimeEq(self, timeDiff):
@@ -233,9 +233,9 @@ class CellDb(db.Model):
         if self.is_taking == True and self.finish_time < currTime:
             if self.build_type == "base" and self.owner != self.attacker:
                 self.build_type = "empty"
-            if not self.build_finish:
-                self.build_finish = True
-                self.build_time = 0
+                if not self.build_finish:
+                    self.build_finish = True
+                    self.build_time = 0
             self.is_taking = False
             self.owner     = self.attacker
             self.occupy_time = self.finish_time
