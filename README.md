@@ -53,17 +53,18 @@ both free addons for a verified account)
 
 + You need some extra settings to make it work.
 
-    + ```heroku config:set ADMIN_PASSWORD=``` sets the admin password to restart the ga      me. You should probably set this for an official game otherwise anyone has the
-      to restart your game
+    + ```heroku config:set ADMIN_PASSWORD=``` sets the admin password to restart the 
+      game. You should probably set this for an official game otherwise anyone can           restart your game when it's on going.
 
     + ```heroku config:set GAME_FEATURE='{"base":true, "gold":true, "energy":true, "boost":true, "blast":true, "multiattack":true}'``` 
       sets the feature in the game.
-      This will enable you to change the features in enviroment variable instead of
+      This will allow you to change the features in enviroment variable instead of
       changing the code.
 
-    + (optional) ```heroku config:set GAME_REFRESH_INTERVAL=``` sets the interval
-      for game refresh. The smaller this value is, the faster the game will calculate
-      everything, thus slower your server. The default value is 0.1.
+    + (Optional) ```heroku config:set GAME_REFRESH_INTERVAL=``` sets the interval
+      for game refresh. The smaller this value is, the more frequently the game 
+      will calculate everything, 
+      thus slower your server will be. The default value is 0.1.
 
 + You need to change the server address in some js files to point it to your own server.
 
