@@ -1,5 +1,5 @@
 //hostUrl = "http://localhost:8000/"
-hostUrl = "http://colorfight.herokuapp.com/"
+hostUrl = "http://colorfight-calpoly.herokuapp.com/"
 var gameStatus = {"cellSize":20, 'cells':[], 'info':[], 'selectId': -1, 'globalDirty': false}
 var once = {'once':0};
 var lastUpdate = 0;
