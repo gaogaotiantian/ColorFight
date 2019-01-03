@@ -43,7 +43,7 @@ you need to do.
 
 + Fork this repo, clone to your local machine.
 
-+ Link the repo to the heroku app with ```heroku remote:git -a my-colorfight```
++ Link the repo to the heroku app with ```heroku git:remote -a my-colorfight```
 
 + Create the addons. You need Heroku Postgres ```heroku addons:create heroku-postgresql:hobby-dev``` and Redis Cloud ```heroku addons:create rediscloud:30```.(These are
 both free addons for a verified account)
