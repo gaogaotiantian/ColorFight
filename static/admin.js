@@ -1,5 +1,5 @@
 //hostUrl = "http://localhost:8000/"
-hostUrl = "https://colorfight.herokuapp.com/"
+hostUrl = "https://colorfight-ucsd.herokuapp.com/"
 CreateGame = function(soft) {
     var aiOnly = false;
     if ($('#ai_only').find(":selected").text() == 'Yes') {
