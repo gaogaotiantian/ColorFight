@@ -268,16 +268,16 @@ class CellDb(db.Model):
 
         takeTime = (self.GetTakeTime(currTime) * min(1, 1 - 0.25*(adjCells - 1))) / (1 + user.energy/200.0)
 
-        if BOOST_ENABLE:
-            if boost == True:
-                if user.energy < energyShop['boost']:
-                    return False, 5, "You don't have enough energy"
-                else:
-                    user.energy -= energyShop['boost']
-                    takeTime = max(1, takeTime * 0.25)
+        if BOOST_ENABLE and boost == True:
+            if user.energy < energyShop['boost']:
+                return False, 5, "You don't have enough energy"
             else:
-                if user.energy > 0 and self.owner != 0 and user.id != self.owner:
-                    user.energy = user.energy * 0.95
+                user.energy -= energyShop['boost']
+                takeTime = max(1, takeTime * 0.25)
+        else:
+            if user.energy > 0 and self.owner != 0 and user.id != self.owner:
+                user.energy = user.energy * 0.95
+
         self.attacker = user.id
         self.attack_time = currTime
         self.finish_time = currTime + takeTime
