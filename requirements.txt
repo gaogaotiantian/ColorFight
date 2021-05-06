@@ -8,7 +8,7 @@ cryptography==3.2
 decorator==4.1.2
 enum34==1.1.6
 Flask==1.0
-Flask-Cors==3.0.3
+Flask-Cors==3.0.9
 Flask-SQLAlchemy==2.3.1
 gevent==1.2.2
 greenlet==0.4.12
@@ -18,7 +18,7 @@ ipaddress==1.0.18
 ipython==5.5.0
 ipython-genutils==0.2.0
 itsdangerous==0.24
-Jinja2==2.9.6
+Jinja2==2.11.3
 line-profiler==2.0
 MarkupSafe==1.0
 pathlib2==2.3.0
