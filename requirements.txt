@@ -31,7 +31,7 @@ pycparser==2.18
 Pygments==2.2.0
 pyOpenSSL==17.3.0
 redis==2.10.6
-requests==2.18.4
+requests==2.20.0
 scandir==1.6
 simplegeneric==0.8.1
 six==1.11.0
